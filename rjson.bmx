@@ -1,5 +1,5 @@
-' twrc/rjson.bmx
-'   reflection-based JSON encoder/decoder for BlitzMax
+' bmx-rjson
+'   reflection-based JSON encoder/decoder
 '   by Tyler W.R. Cole
 '   written according to the JSON specification http://www.json.org
 '   with the following minor modifications(s):
@@ -9,6 +9,8 @@ SuperStrict
 Module twrc.rjson
 Import brl.reflection
 Import brl.retro
+Import brl.linkedlist
+Import brl.map
 
 
 Type JSON
@@ -33,38 +35,103 @@ Type JSON
 				source_object_type_id = TTypeId.ForObject( source_object )
 			End If
 			Local type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_type_id )
-			Local is_array% = source_object_type_id.ElementType() <> Null
-			If Not is_array
-				Select source_object_type_id
-					Case StringTypeId
-						encoded_json_data :+ STRING_BEGIN
-						encoded_json_data :+ _StringEscape( source_object.ToString() )
-						encoded_json_data :+ STRING_END
-					Default 'User-Defined-Type
-						encoded_json_data :+ OBJECT_BEGIN
-						If settings.pretty_print Then encoded_json_data :+ "~n"
-						If settings.pretty_print Then indent :+ 1
-						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-						Local source_object_fields:TList = CreateList()
-						Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
-						While source_object_super_type_id
-							source_object_super_type_id.EnumFields( source_object_fields )
-							source_object_super_type_id = source_object_super_type_id.SuperType()
-						End While
-						source_object_type_id.EnumFields( source_object_fields )
-						Local field_count% = source_object_fields.Count()
-						Local field_index% = 0
+			If type_metadata.IsCustomEncoderDefined()
+				encoded_json_data :+ type_metadata.custom_encoder( source_object, settings, override_type, indent )
+			Else 'no custom encoder; decide what to do intelligently
+				Local is_array% = source_object_type_id.ElementType() <> Null
+				If Not is_array
+					Select source_object_type_id
+						Case StringTypeId
+							encoded_json_data :+ STRING_BEGIN
+							encoded_json_data :+ _StringEscape( source_object.ToString() )
+							encoded_json_data :+ STRING_END
+						Default 'User-Defined-Type
+							encoded_json_data :+ OBJECT_BEGIN
+							Local source_object_fields:TList = CreateList()
+							Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
+							While source_object_super_type_id
+								source_object_super_type_id.EnumFields( source_object_fields )
+								source_object_super_type_id = source_object_super_type_id.SuperType()
+							End While
+							source_object_type_id.EnumFields( source_object_fields )
+							Local field_count% = source_object_fields.Count()
+							If field_count > 0
+								If settings.pretty_print Then encoded_json_data :+ "~n"
+								If settings.pretty_print Then indent :+ 1
+								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+								Local field_index% = 0
+								Local value:Object
+								For Local source_object_field:TField = EachIn source_object_fields
+									If Not type_metadata.IsFieldIgnored( source_object_field )
+										value = source_object_field.Get( source_object )
+										encoded_json_data :+ STRING_BEGIN
+										encoded_json_data :+ source_object_field.Name()
+										encoded_json_data :+ STRING_END
+										encoded_json_data :+ PAIR_SEPARATOR
+										If settings.pretty_print Then encoded_json_data :+ " "
+										Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
+										Local field_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_field_type_id )
+										Local field_override_type:TTypeId = Null
+										If field_type_metadata.IsFieldTypeOverridden( source_object_field )
+											field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
+										End If
+										If field_type_metadata.IsCustomEncoderDefined()
+											encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
+										Else
+											Select source_object_field_type_id
+												Case ByteTypeId, ..
+												     ShortTypeId, ..
+													   IntTypeId, ..
+												     LongTypeId, ..
+												     FloatTypeId, ..
+												     DoubleTypeId
+													encoded_json_data :+ value.ToString()
+												Default
+													encoded_json_data :+ Encode( value, settings,, indent )
+											End Select
+										End If
+										If field_index < (field_count - 1) 'Not last member
+											encoded_json_data :+ MEMBER_SEPARATOR
+											If settings.pretty_print Then encoded_json_data :+ "~n"
+											If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+										End If
+									End If
+									field_index :+ 1
+								Next
+								If settings.pretty_print Then encoded_json_data :+ "~n"
+								If settings.pretty_print Then indent :- 1
+								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+							End If
+							encoded_json_data :+ OBJECT_END
+					End Select
+				Else 'Array type
+					Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
+					Local dimension_lengths%[] = New Int[dimensions]
+					For Local d% = 0 Until dimensions
+						dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
+					Next
+					Local array_length% = source_object_type_id.ArrayLength( source_object )
+					If array_length = 0
+						encoded_json_data :+ ARRAY_BEGIN
+						encoded_json_data :+ ARRAY_END
+					Else 'array_length <> 0
+						Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
 						Local value:Object
-						For Local source_object_field:TField = EachIn source_object_fields
-							If Not type_metadata.IsFieldIgnored( source_object_field )
-								value = source_object_field.Get( source_object )
-								encoded_json_data :+ STRING_BEGIN
-								encoded_json_data :+ source_object_field.Name()
-								encoded_json_data :+ STRING_END
-								encoded_json_data :+ PAIR_SEPARATOR
-								If settings.pretty_print Then encoded_json_data :+ " "
-								Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
-								Select source_object_field_type_id
+						For Local index% = 0 Until array_length
+							For Local d% = 0 Until dimensions
+								If index Mod dimension_lengths[d] = 0
+									encoded_json_data :+ ARRAY_BEGIN
+									If settings.pretty_print Then encoded_json_data :+ "~n"
+									If settings.pretty_print Then indent :+ 1
+									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+								End If
+							Next
+							value = source_object_type_id.GetArrayElement( source_object, index )
+							Local element_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_element_type_id )
+							If element_type_metadata.IsCustomEncoderDefined()
+								encoded_json_data :+ element_type_metadata.custom_encoder( value, settings, Null, indent )
+							Else
+								Select source_object_element_type_id
 									Case ByteTypeId, ..
 									     ShortTypeId, ..
 										   IntTypeId, ..
@@ -75,65 +142,25 @@ Type JSON
 									Default
 										encoded_json_data :+ Encode( value, settings,, indent )
 								End Select
-								If field_index < (field_count - 1) 'Not last member
-									encoded_json_data :+ MEMBER_SEPARATOR
+							End If
+							Local separator% = False
+							For Local d% = (dimensions-1) To 0 Step -1
+								If (index + 1) Mod dimension_lengths[d] = 0
+									If settings.pretty_print Then encoded_json_data :+ "~n"
+									If settings.pretty_print Then indent :- 1
+									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+									encoded_json_data :+ ARRAY_END
+								End If
+								If Not separator And (index + 1) Mod dimension_lengths[d] <> 0
+									encoded_json_data :+ VALUE_SEPARATOR
 									If settings.pretty_print Then encoded_json_data :+ "~n"
 									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+									separator = True
 								End If
-							End If
-							field_index :+ 1
+							Next
 						Next
-						If settings.pretty_print Then encoded_json_data :+ "~n"
-						If settings.pretty_print Then indent :- 1
-						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-						encoded_json_data :+ OBJECT_END
-					End Select
-			Else 'Array type
-				Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
-				Local dimension_lengths%[] = New Int[dimensions]
-				For Local d% = 0 Until dimensions
-					dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
-				Next
-				Local array_length% = source_object_type_id.ArrayLength( source_object )
-				Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
-				Local value:Object
-				For Local index% = 0 Until array_length
-					For Local d% = 0 Until dimensions
-						If index Mod dimension_lengths[d] = 0
-							encoded_json_data :+ ARRAY_BEGIN
-							If settings.pretty_print Then encoded_json_data :+ "~n"
-							If settings.pretty_print Then indent :+ 1
-							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-						End If
-					Next
-					value = source_object_type_id.GetArrayElement( source_object, index )
-					Select source_object_element_type_id
-						Case ByteTypeId, ..
-						     ShortTypeId, ..
-							   IntTypeId, ..
-						     LongTypeId, ..
-						     FloatTypeId, ..
-						     DoubleTypeId
-							encoded_json_data :+ value.ToString()
-						Default
-							encoded_json_data :+ Encode( value, settings,, indent )
-					End Select
-					Local separator% = False
-					For Local d% = (dimensions-1) To 0 Step -1
-						If (index + 1) Mod dimension_lengths[d] = 0
-							If settings.pretty_print Then encoded_json_data :+ "~n"
-							If settings.pretty_print Then indent :- 1
-							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-							encoded_json_data :+ ARRAY_END
-						End If
-						If Not separator And (index + 1) Mod dimension_lengths[d] <> 0
-							encoded_json_data :+ VALUE_SEPARATOR
-							If settings.pretty_print Then encoded_json_data :+ "~n"
-							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-							separator = True
-						End If
-					Next
-				Next
+					End If
+				End If
 			End If
 			Return encoded_json_data
 		End If
@@ -177,6 +204,74 @@ Type JSON
 	'///////////
 	'  private
 	'///////////
+	
+	Function _EncodeTypeTJSONWrapperObject:String( source_object:Object, settings:TJSONEncodeSettings = Null, override_type:TTypeId = Null, indent% = 0 )
+		If source_object Then Return source_object.ToString() Else Return "null"
+	End Function
+	
+	Function _EncodeTypeTList:String( source_object:Object, settings:TJSONEncodeSettings = Null, override_type:TTypeId = Null, indent% = 0 )
+		Local encoded_json_data:String = ""
+		Local list:TList = TList(source_object)
+		If list
+			encoded_json_data :+ ARRAY_BEGIN
+			Local size% = list.Count()
+			If size > 0
+				If settings.pretty_print Then encoded_json_data :+ "~n"
+				If settings.pretty_print Then indent :+ 1
+				If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+				Local index% = 0
+				For Local element:Object = EachIn list
+					encoded_json_data :+ Encode( element, settings, Null, indent )
+					index :+ 1
+					If index < size
+						encoded_json_data :+ VALUE_SEPARATOR
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					Else 'index >= size
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then indent :- 1
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					End If
+				Next
+			End If
+			encoded_json_data :+ ARRAY_END
+		End If
+		Return encoded_json_data
+	End Function
+	
+	Function _EncodeTypeTMap:String( source_object:Object, settings:TJSONEncodeSettings = Null, override_type:TTypeId = Null, indent% = 0 )
+		Local encoded_json_data:String = ""
+		Local map:TMap = TMap(source_object)
+		If map
+			encoded_json_data :+ OBJECT_BEGIN
+			Local iter:TNodeEnumerator = map.Keys().ObjectEnumerator()
+			If iter.HasNext()
+				If settings.pretty_print Then encoded_json_data :+ "~n"
+				If settings.pretty_print Then indent :+ 1
+				If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+				While iter.HasNext()
+					Local key_obj:Object = iter.NextObject()
+					encoded_json_data :+ STRING_BEGIN
+					encoded_json_data :+ key_obj.ToString()
+					encoded_json_data :+ STRING_END
+					encoded_json_data :+ PAIR_SEPARATOR
+					If settings.pretty_print Then encoded_json_data :+ " "
+					encoded_json_data :+ Encode( map.ValueForKey( key_obj ), settings, Null, indent )
+					If iter.HasNext()
+						encoded_json_data :+ VALUE_SEPARATOR
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					Else 'last element
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then indent :- 1
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					End If
+				End While
+			End If
+			encoded_json_data :+ OBJECT_END
+		End If
+		Return encoded_json_data
+	End Function
 	
 	'string, number, object, array, true, false, null
 	Function _DecodeJSONValue:Object( encoded_json_data:String, cursor:Int Var )
@@ -498,54 +593,73 @@ Type TJSONEncodeSettings
 		pretty_print = True
 		tab_size = 2
 		metadata = CreateMap()
+		'default encoders
+		SetCustomEncoder( TTypeId.ForName("TJSONBoolean"), JSON._EncodeTypeTJSONWrapperObject )
+		SetCustomEncoder( TTypeId.ForName("TJSONLong"), JSON._EncodeTypeTJSONWrapperObject )
+		SetCustomEncoder( TTypeId.ForName("TJSONDouble"), JSON._EncodeTypeTJSONWrapperObject )
+		SetCustomEncoder( TTypeId.ForName("TList"), JSON._EncodeTypeTList )
+		SetCustomEncoder( TTypeId.ForName("TMap"), JSON._EncodeTypeTMap )
 	End Method
 	'////
-	Method GetTypeMetadata:TJSONTypeSpecificMetadata( typeId:TTypeId )
-		Local type_metadata:TJSONTypeSpecificMetadata = TJSONTypeSpecificMetadata( metadata.ValueForKey( typeId ))
+	Method GetTypeMetadata:TJSONTypeSpecificMetadata( type_id:TTypeId )
+		Local type_metadata:TJSONTypeSpecificMetadata = TJSONTypeSpecificMetadata( metadata.ValueForKey( type_id ))
 		If Not type_metadata
 			type_metadata = New TJSONTypeSpecificMetadata
-			metadata.Insert( typeId, type_metadata )
+			metadata.Insert( type_id, type_metadata )
 		End If
 		Return type_metadata
 	End Method
 	'////
-	Method IgnoreField( typeId:TTypeId, field_ref:TField )
-		GetTypeMetadata( typeId ).IgnoreField( field_ref )
+	Method IgnoreField( type_id:TTypeId, field_ref:TField )
+		GetTypeMetadata( type_id ).IgnoreField( field_ref )
 	End Method
 	'////
-	Method OverrideFieldType( typeId:TTypeId, field_ref:TField, field_type:TTypeId )
-		GetTypeMetadata( typeId ).OverrideFieldType( field_ref, field_type )
+	Method OverrideFieldType( type_id:TTypeId, field_ref:TField, field_type:TTypeId )
+		GetTypeMetadata( type_id ).OverrideFieldType( field_ref, field_type )
+	End Method
+	'////
+	Method SetCustomEncoder( type_id:TTypeId, custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% ))
+		GetTypeMetadata( type_id ).SetCustomEncoder( custom_encoder )
 	End Method
 End Type
 
 ' type-specific metadata describes fields to ignore and fields to override with explicit types
 Type TJSONTypeSpecificMetadata
-	Field ignoreFields:TList      'TList<String> specifies fields to ignore
-	Field fieldTypeOverrides:TMap 'maps blitzmax fields to types (to use as overrides)
+	Field ignore_fields:TList      'TList<String> specifies fields to ignore
+	Field field_type_overrides:TMap 'maps blitzmax fields to types (to use as overrides)
+	Field custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% )
 	'////
 	Method New()
-		ignoreFields = CreateList()
-		fieldTypeOverrides = CreateMap()
+		ignore_fields = CreateList()
+		field_type_overrides = CreateMap()
 	End Method
 	'////
 	Method IsFieldIgnored%( field_ref:TField )
-		Return ignoreFields.Contains( field_ref )
+		Return ignore_fields.Contains( field_ref )
 	End Method
 	'////
 	Method IsFieldTypeOverridden%( field_ref:TField )
-		Return fieldTypeOverrides.Contains( field_ref )
+		Return field_type_overrides.Contains( field_ref )
 	End Method
 	'////
 	Method GetFieldTypeOverride:TTypeId( field_ref:TField )
-		Return TTypeId( fieldTypeOverrides.ValueForKey( field_ref ))
+		Return TTypeId( field_type_overrides.ValueForKey( field_ref ))
 	End Method
 	'////
 	Method IgnoreField( field_ref:TField )
-		ignoreFields.AddLast( field_ref )
+		ignore_fields.AddLast( field_ref )
 	End Method
 	'////
 	Method OverrideFieldType( field_ref:TField, field_type:TTypeId )
-		fieldTypeOverrides.Insert( field_ref, field_type )
+		field_type_overrides.Insert( field_ref, field_type )
+	End Method
+	'////
+	Method SetCustomEncoder( custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% ))
+		Self.custom_encoder = custom_encoder
+	End Method
+	'////
+	Method IsCustomEncoderDefined%()
+		Return Self.custom_encoder <> Null
 	End Method
 End Type
 

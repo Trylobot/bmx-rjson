@@ -1,7 +1,47 @@
+' test suite for bmx-rjson
 SuperStrict
 Import twrc.rjson
+'Import "rjson.bmx"
 
 Try
+
+'////////////////////////////////////////
+'////////////////////////////////////////
+'////////////////////////////////////////
+Print( "~n~ntest suite 0 - wrapper types" )
+
+'////////////////////////////////////////
+Print( "~ntest 0.1 - null - Null" )
+Print JSON.Encode( Null )
+
+'////////////////////////////////////////
+Print( "~ntest 0.2 - boolean - JSON only" )
+Local b:TJSONBoolean
+b = TJSONBoolean.Create( True )
+Print JSON.Encode( b )
+b = TJSONBoolean.Create( False )
+Print JSON.Encode( b )
+
+'////////////////////////////////////////
+Print( "~ntest 0.3 - number - (Byte/Short/Int/Long)" )
+Local nl:TJSONLong
+nl = TJSONLong.Create( Byte(85) )
+Print JSON.Encode( nl )
+nl = TJSONLong.Create( Short(85) )
+Print JSON.Encode( nl )
+nl = TJSONLong.Create( Int(85) )
+Print JSON.Encode( nl )
+nl = TJSONLong.Create( Long(85) )
+Print JSON.Encode( nl )
+
+'////////////////////////////////////////
+Print( "~ntest 0.4 - number - (Float/Double)" )
+Local nd:TJSONDouble
+nd = TJSONDouble.Create( Float(85.1) )
+Print JSON.Encode( nd )
+nd = TJSONDouble.Create( Double(85.1) )
+Print JSON.Encode( nd )
+
 
 '////////////////////////////////////////
 '////////////////////////////////////////
@@ -134,6 +174,48 @@ Print( "  +pretty_print" )
 encoded_json_string = JSON.Encode( arr2d_i, settings )
 Print( encoded_json_string )
 
+'////////////////////////////////////////
+Print( "~ntest 1.5 - TList" )
+Local ls:TList = CreateList()
+ls.AddLast( "String Value!" )
+ls.AddLast( [ 0, 1, 2, 4, 8 ] )
+ls.AddLast( CreateList() )
+ls.AddLast( New Int[0] )
+ls.AddLast( TJSONDouble.Create( 0.004824146 ))
+ls.AddLast( TJSONLong.Create( 4257481243 ))
+ls.AddLast( TJSONBoolean.Create( True ))
+'///
+settings.pretty_print = False
+Print( "  -pretty_print" )
+encoded_json_string = JSON.Encode( ls, settings )
+Print( encoded_json_string )
+'///
+settings.pretty_print = True
+Print( "  +pretty_print" )
+encoded_json_string = JSON.Encode( ls, settings )
+Print( encoded_json_string )
+
+'////////////////////////////////////////
+Print( "~ntest 1.6 - TMap" )
+Local mp:TMap = CreateMap()
+mp.Insert( "key1", "String Value!" )
+mp.Insert( "key2", [ 0, 1, 2, 4, 8 ] )
+mp.Insert( "key3", CreateList() )
+mp.Insert( "key4", New Int[0] )
+mp.Insert( "key5", TJSONDouble.Create( 0.004824146 ))
+mp.Insert( "key6", TJSONLong.Create( 4257481243 ))
+mp.Insert( "key7", TJSONBoolean.Create( True ))
+'///
+settings.pretty_print = False
+Print( "  -pretty_print" )
+encoded_json_string = JSON.Encode( mp, settings )
+Print( encoded_json_string )
+'///
+settings.pretty_print = True
+Print( "  +pretty_print" )
+encoded_json_string = JSON.Encode( mp, settings )
+Print( encoded_json_string )
+
 
 '////////////////////////////////////////
 '////////////////////////////////////////
@@ -217,7 +299,7 @@ Print( "~ntest 2.9 - object of arbitrary type" )
 encoded_json_string = ..
 "{~qb~q:135,~qs~q:36700,~qi~q:1587492043,~ql~q:4958248718354,~qf~q:0.00004524,~qd~q:1498510.459,~qstr~q:~qHello,World!~q,"+..
 "~qbx~q:[12,23,135,3],~qsx~q:[1000,3000,5000,20400],~qix~q:[1475,192334,4952408],~qlx~q:[4498524,4198475049,8968763549],"+..
-"~qfx~q:[0.2498,0.004245,14356000.0],~qdx~q:[1.29854e24,1.4985,0.024587e-31],~qstrx~q:[~qHello1~q,~qHello2~q,~qHello3~q,50],"+..
+"~qfx~q:[0.2498,0.004245,14356000.0],~qdx~q:[1.29854e24,1.4985,0.024587e-31],~qstrx~q:[~qHello1~q,~qHello2~q,~qHello3~q],"+..
 "~qo1str~q:~qString~q,~qo1x~q:[~qString1~q,~qString2~q,~qString3~q],~qo1udt~q:{~qa~q:50,~qb~q:100,~qc~q:150}}"
 Print( "encoded: "+encoded_json_string )
 Local ed:ExampleData
@@ -346,8 +428,6 @@ End Try
 
 '////////////////////////////////////////
 'Print( "~ntest 4.1 - decoding with incompatible type" )
-
-
 
 
 
