@@ -1,6 +1,6 @@
-mkdir twrc.mod\
-mkdir twrc.mod\rjson.mod\
-mkdir twrc.mod\rjson.mod\test\
-copy rjson.bmx twrc.mod\rjson.mod\
-copy rjson-test.bmx twrc.mod\rjson.mod\test\
+mkdir mod\twrc.mod\
+mkdir mod\twrc.mod\rjson.mod\
+mkdir mod\twrc.mod\rjson.mod\test\
+copy rjson.bmx mod\twrc.mod\rjson.mod\
+copy rjson-test.bmx mod\twrc.mod\rjson.mod\test\
 pause
