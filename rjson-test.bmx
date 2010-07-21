@@ -1,7 +1,7 @@
 ' test suite for bmx-rjson
 SuperStrict
-'Import twrc.rjson
-Import "rjson.bmx"
+Import twrc.rjson
+'Import "rjson.bmx"
 
 '////////////////////////////////////////
 '////////////////////////////////////////

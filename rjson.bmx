@@ -6,7 +6,7 @@
 '   - when decoding, it is okay for numbers to have any number of leading zeroes
 
 SuperStrict
-'Module twrc.rjson
+Module twrc.rjson
 Import brl.reflection
 Import brl.retro
 Import brl.linkedlist
