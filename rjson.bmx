@@ -38,129 +38,7 @@ Type JSON
 			If type_metadata.IsCustomEncoderDefined()
 				encoded_json_data :+ type_metadata.custom_encoder( source_object, settings, override_type, indent )
 			Else 'no custom encoder; decide what to do intelligently
-				Local is_array% = source_object_type_id.ElementType() <> Null
-				If Not is_array
-					Select source_object_type_id
-						Case StringTypeId
-							encoded_json_data :+ STRING_BEGIN
-							encoded_json_data :+ _StringEscape( source_object.ToString() )
-							encoded_json_data :+ STRING_END
-						Default 'User-Defined-Type
-							encoded_json_data :+ OBJECT_BEGIN
-							Local source_object_fields:TList = CreateList()
-							Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
-							While source_object_super_type_id
-								source_object_super_type_id.EnumFields( source_object_fields )
-								source_object_super_type_id = source_object_super_type_id.SuperType()
-							End While
-							source_object_type_id.EnumFields( source_object_fields )
-							Local field_count% = source_object_fields.Count()
-							If field_count > 0
-								If settings.pretty_print Then encoded_json_data :+ "~n"
-								If settings.pretty_print Then indent :+ 1
-								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-								Local field_index% = 0
-								Local value:Object
-								For Local source_object_field:TField = EachIn source_object_fields
-									If Not type_metadata.IsFieldIgnored( source_object_field )
-										value = source_object_field.Get( source_object )
-										encoded_json_data :+ STRING_BEGIN
-										encoded_json_data :+ source_object_field.Name()
-										encoded_json_data :+ STRING_END
-										encoded_json_data :+ PAIR_SEPARATOR
-										If settings.pretty_print Then encoded_json_data :+ " "
-										Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
-										Local field_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_field_type_id )
-										Local field_override_type:TTypeId = Null
-										If field_type_metadata.IsFieldTypeOverridden( source_object_field )
-											field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
-										End If
-										If field_type_metadata.IsCustomEncoderDefined()
-											encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
-										Else
-											Select source_object_field_type_id
-												Case ByteTypeId, ..
-												     ShortTypeId, ..
-													   IntTypeId, ..
-												     LongTypeId
-													encoded_json_data :+ value.ToString()
-												Case FloatTypeId, ..
-												     DoubleTypeId
-													encoded_json_data :+ TJSONDouble.ApplyPrecision(value.ToString(), settings.default_precision)
-												Default
-													encoded_json_data :+ Encode( value, settings,, indent )
-											End Select
-										End If
-										If field_index < (field_count - 1) 'Not last member
-											encoded_json_data :+ MEMBER_SEPARATOR
-											If settings.pretty_print Then encoded_json_data :+ "~n"
-											If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-										End If
-									End If
-									field_index :+ 1
-								Next
-								If settings.pretty_print Then encoded_json_data :+ "~n"
-								If settings.pretty_print Then indent :- 1
-								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-							End If
-							encoded_json_data :+ OBJECT_END
-					End Select
-				Else 'Array type
-					Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
-					Local dimension_lengths%[] = New Int[dimensions]
-					For Local d% = 0 Until dimensions
-						dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
-					Next
-					Local array_length% = source_object_type_id.ArrayLength( source_object )
-					If array_length = 0
-						encoded_json_data :+ ARRAY_BEGIN
-						encoded_json_data :+ ARRAY_END
-					Else 'array_length <> 0
-						Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
-						Local value:Object
-						For Local index% = 0 Until array_length
-							For Local d% = 0 Until dimensions
-								If index Mod dimension_lengths[d] = 0
-									encoded_json_data :+ ARRAY_BEGIN
-									If settings.pretty_print Then encoded_json_data :+ "~n"
-									If settings.pretty_print Then indent :+ 1
-									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-								End If
-							Next
-							value = source_object_type_id.GetArrayElement( source_object, index )
-							Local element_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_element_type_id )
-							If element_type_metadata.IsCustomEncoderDefined()
-								encoded_json_data :+ element_type_metadata.custom_encoder( value, settings, Null, indent )
-							Else
-								Select source_object_element_type_id
-									Case ByteTypeId, ..
-									     ShortTypeId, ..
-										   IntTypeId, ..
-									     LongTypeId
-										encoded_json_data :+ value.ToString()
-									Case FloatTypeId, ..
-									     DoubleTypeId
-										encoded_json_data :+ TJSONDouble.ApplyPrecision(value.ToString(), settings.default_precision)
-									Default
-										encoded_json_data :+ Encode( value, settings,, indent )
-								End Select
-							End If
-							For Local d% = (dimensions-1) To 0 Step -1
-								If (index + 1) Mod dimension_lengths[d] = 0
-									If settings.pretty_print Then encoded_json_data :+ "~n"
-									If settings.pretty_print Then indent :- 1
-									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-									encoded_json_data :+ ARRAY_END
-								End If
-							Next
-							If index < (array_length - 1)
-								encoded_json_data :+ VALUE_SEPARATOR
-								If settings.pretty_print Then encoded_json_data :+ "~n"
-								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-							End If
-						Next
-					End If
-				End If
+				encoded_json_data :+ _EncodeObject( source_object, settings, source_object_type_id, indent )
 			End If
 			Return encoded_json_data
 		End If
@@ -200,10 +78,143 @@ Type JSON
 			Return "0x" + Hex( 0 )
 		End If
 	End Function
-
+	
 	'///////////
 	'  private
 	'///////////
+	
+	Function _EncodeObject:String( source_object:Object, settings:TJSONEncodeSettings = Null, source_object_type_id:TTypeId = Null, indent% = 0 )
+		Local encoded_json_data:String = ""
+		Local type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_type_id )
+		Local is_array% = source_object_type_id.ElementType() <> Null
+		If Not is_array
+			Select source_object_type_id
+				Case StringTypeId
+					encoded_json_data :+ STRING_BEGIN
+					encoded_json_data :+ _StringEscape( source_object.ToString() )
+					encoded_json_data :+ STRING_END
+				Default 'User-Defined-Type
+					encoded_json_data :+ OBJECT_BEGIN
+					Local source_object_fields:TList = CreateList()
+					Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
+					While source_object_super_type_id
+						source_object_super_type_id.EnumFields( source_object_fields )
+						source_object_super_type_id = source_object_super_type_id.SuperType()
+					End While
+					source_object_type_id.EnumFields( source_object_fields )
+					Local field_count% = source_object_fields.Count()
+					If field_count > 0
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then indent :+ 1
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+						Local field_index% = 0
+						Local value:Object
+						For Local source_object_field:TField = EachIn source_object_fields
+							If Not type_metadata.IsFieldIgnored( source_object_field )
+								encoded_json_data :+ STRING_BEGIN
+								encoded_json_data :+ source_object_field.Name()
+								encoded_json_data :+ STRING_END
+								encoded_json_data :+ PAIR_SEPARATOR
+								If settings.pretty_print Then encoded_json_data :+ " "
+								Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
+								Local field_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_field_type_id )
+								Local field_override_type:TTypeId = Null
+								If field_type_metadata.IsFieldTypeOverridden( source_object_field )
+									field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
+								End If
+								If field_type_metadata.IsCustomEncoderDefined()
+									encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
+								Else
+									Select source_object_field_type_id
+										Case ByteTypeId, ..
+										     ShortTypeId, ..
+											   IntTypeId, ..
+										     LongTypeId
+											value = source_object_field.Get( source_object )
+											encoded_json_data :+ String(value) 'value will have already been converted to a string
+										Case FloatTypeId
+											Local value_float:Float = source_object_field.GetFloat( source_object )
+											encoded_json_data :+ TJSONDouble.Create( value_float ).Format( settings.default_precision )
+										Case DoubleTypeId
+											Local value_double:Double = source_object_field.GetDouble( source_object )
+											encoded_json_data :+ TJSONDouble.Create( value_double ).Format( settings.default_precision )
+										Default
+											value = source_object_field.Get( source_object )
+											encoded_json_data :+ Encode( value, settings,, indent )
+									End Select
+								End If
+								If field_index < (field_count - 1) 'Not last member
+									encoded_json_data :+ MEMBER_SEPARATOR
+									If settings.pretty_print Then encoded_json_data :+ "~n"
+									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+								End If
+							End If
+							field_index :+ 1
+						Next
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then indent :- 1
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					End If
+					encoded_json_data :+ OBJECT_END
+			End Select
+		Else 'Array type
+			Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
+			Local dimension_lengths%[] = New Int[dimensions]
+			For Local d% = 0 Until dimensions
+				dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
+			Next
+			Local array_length% = source_object_type_id.ArrayLength( source_object )
+			If array_length = 0
+				encoded_json_data :+ ARRAY_BEGIN
+				encoded_json_data :+ ARRAY_END
+			Else 'array_length <> 0
+				Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
+				Local value:Object
+				For Local index% = 0 Until array_length
+					For Local d% = 0 Until dimensions
+						If index Mod dimension_lengths[d] = 0
+							encoded_json_data :+ ARRAY_BEGIN
+							If settings.pretty_print Then encoded_json_data :+ "~n"
+							If settings.pretty_print Then indent :+ 1
+							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+						End If
+					Next
+					value = source_object_type_id.GetArrayElement( source_object, index )
+					Local element_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_element_type_id )
+					If element_type_metadata.IsCustomEncoderDefined()
+						encoded_json_data :+ element_type_metadata.custom_encoder( value, settings, Null, indent )
+					Else
+						Select source_object_element_type_id
+							Case ByteTypeId, ..
+							     ShortTypeId, ..
+								   IntTypeId, ..
+							     LongTypeId
+								encoded_json_data :+ String(value) 'value will have already been converted to a string
+							Case FloatTypeId, ..
+							     DoubleTypeId
+								encoded_json_data :+ TJSONDouble.Create( String(value).ToDouble() ).Format( settings.default_precision )
+							Default
+								encoded_json_data :+ Encode( value, settings,, indent )
+						End Select
+					End If
+					For Local d% = (dimensions-1) To 0 Step -1
+						If (index + 1) Mod dimension_lengths[d] = 0
+							If settings.pretty_print Then encoded_json_data :+ "~n"
+							If settings.pretty_print Then indent :- 1
+							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+							encoded_json_data :+ ARRAY_END
+						End If
+					Next
+					If index < (array_length - 1)
+						encoded_json_data :+ VALUE_SEPARATOR
+						If settings.pretty_print Then encoded_json_data :+ "~n"
+						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+					End If
+				Next
+			End If
+		End If
+		Return encoded_json_data
+	End Function
 	
 	Function _EncodeTypeTJSONWrapperObject:String( source_object:Object, settings:TJSONEncodeSettings = Null, override_type:TTypeId = Null, indent% = 0 )
 		If source_object
@@ -212,7 +223,7 @@ Type JSON
 				     TTypeId.ForName("TJSONLong")
 					Return source_object.ToString()
 				Case TTypeId.ForName("TJSONDouble")
-					Return TJSONDouble.ApplyPrecision( source_object.ToString(), settings.default_precision )
+					Return TJSONDouble(source_object).Format( settings.default_precision )
 			End Select
 		Else
 			Return "null"
@@ -281,6 +292,118 @@ Type JSON
 			encoded_json_data :+ OBJECT_END
 		End If
 		Return encoded_json_data
+	End Function
+	
+	Function _InitializeObject:Object( json_object:TMap, type_id:TTypeId )
+		If type_id = TTypeId.ForName( "TMap" )
+			Return json_object
+		End If
+		Local decoded_object:Object = type_id.NewObject()
+		For Local key$ = EachIn json_object.Keys()
+			Local object_field:TField = type_id.FindField( key )
+			If object_field
+				Local value:Object = json_object.ValueForKey( key )
+				Local object_field_type_id:TTypeId = object_field.TypeId()
+				If Not object_field_type_id.ElementType() 'non-array field type found
+					Try
+						Select object_field_type_id
+							Case ByteTypeId, ..
+							     ShortTypeId, ..
+							     IntTypeId
+								Local decoded_datum:TJSONLong = TJSONLong(value)
+								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								object_field.SetInt( decoded_object, decoded_datum.value )
+							Case LongTypeId
+								Local decoded_datum:TJSONLong = TJSONLong(value)
+								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								object_field.SetLong( decoded_object, decoded_datum.value )
+							Case FloatTypeId
+								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								object_field.SetFloat( decoded_object, decoded_datum.value )
+							Case DoubleTypeId
+								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								object_field.SetDouble( decoded_object, decoded_datum.value )
+							Case StringTypeId
+								Local decoded_datum:String = String(value)
+								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								object_field.Set( decoded_object, decoded_datum )
+							Case ObjectTypeId
+								object_field.Set( decoded_object, value )
+							Default 'user defined objects
+								Local json_child_object:TMap = TMap(value)
+								If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
+								object_field.Set( decoded_object, _InitializeObject( json_child_object, object_field_type_id ))
+						End Select
+					Catch ex$
+						Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
+					End Try
+				Else 'array field type found
+					Local json_child_array:TList = TList(value)
+					If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
+					object_field.Set( decoded_object, _InitializeArray( json_child_array, object_field_type_id ))
+				End If
+			Else
+				Throw( "Error: could not find "+type_id.Name()+"."+key )
+				Return Null
+			End If
+		Next
+		Return decoded_object
+	End Function
+	
+	Function _InitializeArray:Object( json_array:TList, type_id:TTypeId )
+		If type_id = TTypeId.ForName( "TList" )
+			Return json_array
+		End If
+		Local element_type_id:TTypeId = type_id.ElementType()
+		Local size% = json_array.Count()
+		Local decoded_object:Object = type_id.NewArray( size ) 'TODO: check for destination field being a multidimensional array
+		Local index% = 0
+		For Local value:Object = EachIn json_array
+			If Not element_type_id.ElementType() 'non-array element type found
+				Try
+					Select element_type_id
+						Case ByteTypeId, ..
+						     ShortTypeId, ..
+						     IntTypeId
+							Local decoded_datum:TJSONLong = TJSONLong(value)
+							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
+						Case LongTypeId
+							Local decoded_datum:TJSONLong = TJSONLong(value)
+							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
+						Case FloatTypeId
+							Local decoded_datum:TJSONDouble = TJSONDouble(value)
+							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
+						Case DoubleTypeId
+							Local decoded_datum:TJSONDouble = TJSONDouble(value)
+							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
+						Case StringTypeId
+							Local decoded_datum:String = String(value)
+							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							type_id.SetArrayElement( decoded_object, index, decoded_datum )
+						Case ObjectTypeId
+							type_id.SetArrayElement( decoded_object, index, value )
+						Default 'user defined objects
+							Local json_child_object:TMap = TMap(value)
+							If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
+							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, element_type_id ))
+					End Select
+				Catch ex$
+					Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
+				End Try
+			Else 'array element type found
+				Local json_child_array:TList = TList(value)
+				If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
+				type_id.SetArrayElement( decoded_object, index, _InitializeArray( json_child_array, element_type_id ))
+			End If
+			index :+ 1
+		Next
+		Return decoded_object
 	End Function
 	
 	'string, number, object, array, true, false, null
@@ -451,104 +574,6 @@ Type JSON
 		Return json_value
 	End Function
 	
-	Function _InitializeObject:Object( json_object:TMap, type_id:TTypeId )
-		If type_id = TTypeId.ForName( "TMap" )
-			Return json_object
-		End If
-		Local decoded_object:Object = type_id.NewObject()
-		For Local key$ = EachIn json_object.Keys()
-			Local object_field:TField = type_id.FindField( key )
-			If object_field
-				Local value:Object = json_object.ValueForKey( key )
-				Local object_field_type_id:TTypeId = object_field.TypeId()
-				If Not object_field_type_id.ElementType() 'non-array field type found
-					Try
-						Select object_field_type_id
-							Case ByteTypeId, ..
-							     ShortTypeId, ..
-							     IntTypeId
-								Local decoded_datum:TJSONLong = TJSONLong(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetInt( decoded_object, decoded_datum.value )
-							Case LongTypeId
-								Local decoded_datum:TJSONLong = TJSONLong(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetLong( decoded_object, decoded_datum.value )
-							Case FloatTypeId
-								Local decoded_datum:TJSONDouble = TJSONDouble(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetFloat( decoded_object, decoded_datum.value )
-							Case DoubleTypeId
-								Local decoded_datum:TJSONDouble = TJSONDouble(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetDouble( decoded_object, decoded_datum.value )
-							Case StringTypeId
-								Local decoded_datum:String = String(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.Set( decoded_object, decoded_datum )
-							Case ObjectTypeId
-								object_field.Set( decoded_object, value )
-							Default 'user defined objects
-								Local json_child_object:TMap = TMap(value)
-								If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
-								object_field.Set( decoded_object, _InitializeObject( json_child_object, object_field_type_id ))
-						End Select
-					Catch ex$
-						Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
-					End Try
-				Else 'array field type found
-					Local json_child_array:TList = TList(value)
-					If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
-					object_field.Set( decoded_object, _InitializeArray( json_child_array, object_field_type_id ))
-				End If
-			Else
-				Throw( "Error: could not find "+type_id.Name()+"."+key )
-				Return Null
-			End If
-		Next
-		Return decoded_object
-	End Function
-	
-	Function _InitializeArray:Object( json_array:TList, type_id:TTypeId )
-		If type_id = TTypeId.ForName( "TList" )
-			Return json_array
-		End If
-		Local element_type_id:TTypeId = type_id.ElementType()
-		Local size% = json_array.Count()
-		Local decoded_object:Object = type_id.NewArray( size ) 'TODO: check for destination field being a multidimensional array
-		Local index% = 0
-		For Local value:Object = EachIn json_array
-			If Not element_type_id.ElementType() 'non-array element type found
-				Try
-					Select element_type_id
-						Case ByteTypeId, ..
-						     ShortTypeId, ..
-						     IntTypeId, ..
-						     LongTypeId, ..
-						     FloatTypeId, ..
-						     DoubleTypeId, ..
-						     StringTypeId
-							type_id.SetArrayElement( decoded_object, index, value.ToString() )
-						Case ObjectTypeId
-							type_id.SetArrayElement( decoded_object, index, value )
-						Default 'user defined objects
-							Local json_child_object:TMap = TMap(value)
-							If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
-							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, element_type_id ))
-					End Select
-				Catch ex$
-					Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
-				End Try
-			Else 'array element type found
-				Local json_child_array:TList = TList(value)
-				If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
-				type_id.SetArrayElement( decoded_object, index, _InitializeArray( json_child_array, element_type_id ))
-			End If
-			index :+ 1
-		Next
-		Return decoded_object
-	End Function
-	
 	Function _EatWhitespace( str:String, cursor:Int Var )
 		' advance cursor to first printable character
 		While cursor < str.Length And Not _IsPrintable( Chr( str[cursor] ))
@@ -639,7 +664,7 @@ Type TJSONEncodeSettings
 	Field metadata:TMap         'maps blitzmax type-ID's to type-specific encoding settings
 	'////
 	Method New()
-		default_precision = 4
+		default_precision = -1
 		pretty_print = True
 		tab_size = 2
 		metadata = CreateMap()
@@ -745,16 +770,34 @@ Type TJSONDouble
 		Return String.FromDouble(value)
 	End Method
 	'////
-	Function ApplyPrecision:String( double_as_string$, precision:Int )
-		If double_as_string.Contains("e") Then Return double_as_string
-		Local tok$[] = double_as_string.Split(".")
-		If tok.Length <> 2 Then Return double_as_string
-		If tok[1].Length > precision
-			tok[1] = tok[1][..precision]
-			double_as_string = ".".Join(tok)
+	Method Format:String( precision:Int )
+		If precision <> -1
+			Extern "C"
+				Function modf_:Double( x:Double, iptr:Double Var) = "modf"
+				Function snprintf_:Int( s:Byte Ptr, n:Int, Format$z, p:Int, v1:Double) = "snprintf"
+			EndExtern
+			Const STR_FMT:String = "%.*f"
+			Const CHAR_0:Byte = Asc("0")
+			Const CHAR_DOT:Byte = Asc(".")
+			Local i:Double
+			If modf_( value, i) = 0.0 Then
+				Return String.FromLong( Long i)
+			Else
+				Local buf:Byte[32]
+				Local sz:Int = snprintf_( buf, buf.Length, STR_FMT, precision, value)
+				sz :- 1
+				While (sz > 0) And (buf[ sz] = CHAR_0)
+					If buf[ sz-1] = CHAR_DOT Then Exit
+					sz :- 1
+				Wend
+				sz :+ 1
+				If sz > 0 Then Return String.FromBytes( buf, sz)
+			EndIf
+			Return "0"
+		Else
+			Return ToString()
 		End If
-		Return double_as_string
-	End Function
+	End Method
 End Type
 
 ' wrapper type for boolean values

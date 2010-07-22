@@ -17,7 +17,7 @@ Catch ex$
 End Try
 
 '////////////////////////////////////////
-Print( "~ntest 0.2 - boolean - JSON only" )
+Print( "~ntest 0.2 - boolean - (JSON only)" )
 Try
 	Local b:TJSONBoolean
 	b = TJSONBoolean.Create( True )
@@ -47,11 +47,37 @@ End Try
 '////////////////////////////////////////
 Print( "~ntest 0.4 - number - (Float/Double)" )
 Try
+	Local settings:TJSONEncodeSettings = New TJSONEncodeSettings
 	Local nd:TJSONDouble
+	Print "precision = default (maximum)"
 	nd = TJSONDouble.Create( Float(85.1) )
 	Print JSON.Encode( nd )
 	nd = TJSONDouble.Create( Double(85.1) )
 	Print JSON.Encode( nd )
+	Print "precision = 7"
+	settings.default_precision = 7
+	nd = TJSONDouble.Create( Float(85.1) )
+	Print JSON.Encode( nd, settings )
+	nd = TJSONDouble.Create( Double(85.1) )
+	Print JSON.Encode( nd, settings )
+	Print "precision = 4"
+	settings.default_precision = 4
+	nd = TJSONDouble.Create( Float(85.1) )
+	Print JSON.Encode( nd, settings )
+	nd = TJSONDouble.Create( Double(85.1) )
+	Print JSON.Encode( nd, settings )
+	Print "precision = 1"
+	settings.default_precision = 1
+	nd = TJSONDouble.Create( Float(85.1) )
+	Print JSON.Encode( nd, settings )
+	nd = TJSONDouble.Create( Double(85.1) )
+	Print JSON.Encode( nd, settings )
+	Print "precision = 0"
+	settings.default_precision = 0
+	nd = TJSONDouble.Create( Float(85.1) )
+	Print JSON.Encode( nd, settings )
+	nd = TJSONDouble.Create( Double(85.1) )
+	Print JSON.Encode( nd, settings )
 Catch ex$
 	Print "Test FAILED with Exception: "+ex
 End Try
@@ -113,7 +139,7 @@ Type ExampleUserDefinedType
 End Type
 '///
 Local ex_d:ExampleData
-Try
+'Try
 	ex_d = New ExampleData
 	ex_d.b = 135
 	ex_d.s = 36700
@@ -146,9 +172,9 @@ Try
 	Print( "  +pretty_print" )
 	jstr = JSON.Encode( ex_d, settings )
 	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+'Catch ex$
+'	Print "Test FAILED with Exception: "+ex
+'End Try
 
 '////////////////////////////////////////
 Print( "~ntest 1.2b: +ignoreFields( l, f, d, strx )" )
