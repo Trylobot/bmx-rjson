@@ -352,7 +352,7 @@ Try
 	jstr = " [ 5,10,    15, 20 ] "
 	Local ix:Int[]
 	type_id = TTypeId.ForName("Int[]")
-	ix = Int[](JSON.Decode( jstr, type_id ))
+	ix = Int[](JSON.Decode( jstr,, type_id ))
 	For Local i% = 0 Until ix.length
 		If i = 0 Then res = String.FromInt( ix[i] ) Else res :+ String.FromInt( ix[i] )
 		If i < ix.length - 1 Then res :+ ","
@@ -372,7 +372,7 @@ Try
 	jstr = "{ ~qix~q: [ 0, 1, 2, 10, 20, 100, 5000 ] }"
 	Local eic:ExampleIntContainer
 	type_id = TTypeId.ForName("ExampleIntContainer")
-	eic = ExampleIntContainer( JSON.Decode( jstr, type_id ))
+	eic = ExampleIntContainer( JSON.Decode( jstr,, type_id ))
 	For Local i% = 0 Until eic.ix.length
 		If i = 0 Then res = String.FromInt( eic.ix[i] ) Else res :+ String.FromInt( eic.ix[i] )
 		If i < eic.ix.length - 1 Then res :+ ","
@@ -389,7 +389,7 @@ Try
 	jstr = "  { ~qb~q : 250,~qa~q:5  , ~qc~q  :105} "
 	Local eudt:ExampleUserDefinedType
 	type_id = TTypeId.ForName("ExampleUserDefinedType")
-	eudt = ExampleUserDefinedType( JSON.Decode( jstr, type_id ))
+	eudt = ExampleUserDefinedType( JSON.Decode( jstr,, type_id ))
 	Print( jstr+" --> ExampleUserDefinedType("+eudt.ToString()+"): a="+eudt.a+", b="+eudt.b+", c="+eudt.c )
 Catch ex$
 	Print "Test FAILED with Exception: "+ex
@@ -406,7 +406,7 @@ Try
 	Print( "encoded: "+jstr )
 	Local ed:ExampleData
 	type_id = TTypeId.ForName("ExampleData")
-	ed = ExampleData( JSON.Decode( jstr, type_id ))
+	ed = ExampleData( JSON.Decode( jstr,, type_id ))
 	res = "ExampleData("+ed.ToString()+"):"
 	res :+ "~n  "+"b = "+String.FromInt( ed.b )
 	res :+ "~n  "+"s = "+String.FromInt( ed.s )
@@ -492,7 +492,7 @@ End Type
 Try
 	jstr = "{~qmember~q:{~qvalue~q:500}}"
 	type_id = TTypeId.ForName("ExampleObject")
-	Local ex:ExampleObject = ExampleObject( JSON.Decode( jstr, type_id ))
+	Local ex:ExampleObject = ExampleObject( JSON.Decode( jstr,, type_id ))
 	Print( jstr+" --> JSON.Decode(ExampleObject) --> "+JSON.ObjectInfo(ex)+": member = "+JSON.ObjectInfo(ex.member) )
 Catch ex$
 	Print "Test FAILED with Exception: "+ex
@@ -502,7 +502,7 @@ End Try
 Print( "~ntest 2.11 - TMap" )
 Try
 	jstr = "{~qkey1~q:5,~qkey2~q:[10,15,20]}"
-	Local map:TMap = TMap( JSON.Decode( jstr, TTypeId.ForName("TMap") ))
+	Local map:TMap = TMap( JSON.Decode( jstr,, TTypeId.ForName("TMap") ))
 	Print "encoded: "+jstr
 	Print "decoded: "+JSON.ObjectInfo(map)+..
 	"~n  key1 = "+JSON.ObjectInfo(map.ValueForKey("key1"))+..
@@ -524,7 +524,7 @@ End Try
 Print( "~ntest 2.13 - int array array array" )
 Try
 	jstr = "[[[1,2],[4,8]],[[16,32],[64,128]]]"
-	Local ixx:Int[][][] = Int[][][]( JSON.Decode( jstr, TTypeId.ForName("Int[][][]") ))
+	Local ixx:Int[][][] = Int[][][]( JSON.Decode( jstr,, TTypeId.ForName("Int[][][]") ))
 	size = ixx.Length
 	For Local i% = 0 Until size
 		If i = 0 Then res_r = "["
@@ -557,7 +557,7 @@ Try
 	jstr = "[[[1,2],[4,8]],[[16,32],[64,128]]]"
 	Local ix2:Int[,,]
 	type_id = IntTypeId.ArrayType( 3 )
-	ix2 = Int[,,]( JSON.Decode( jstr, type_id ))
+	ix2 = Int[,,]( JSON.Decode( jstr,, type_id ))
 	res_r = ""
 	size = ix2.Length
 	Local dims:Int[] = ix2.Dimensions()
@@ -600,7 +600,7 @@ Try
 	jstr = JSON.Encode( ar_int, settings )
 	Print( "encoded: "+jstr )
 	'///
-	Local d_int:Int[] = Int[]( JSON.Decode( jstr, TTypeId.ForName("Int[]") ))
+	Local d_int:Int[] = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]") ))
 	For Local i% = 0 Until d_int.length
 		If i = 0 Then res = String.FromInt( d_int[i] ) Else res :+ String.FromInt( d_int[i] )
 		If i < d_int.length - 1 Then res :+ ","
@@ -623,7 +623,7 @@ jstr = "[~qstring1~q,~qstring2~q,~qstring3~q]"
 Print "encoded: "+jstr
 Local int_arr:Int[]
 Try
-	int_arr = Int[]( JSON.Decode( jstr, TTypeId.ForName("Int[]") ))
+	int_arr = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]") ))
 	size = int_arr.Length
 	For Local i% = 0 Until size
 		If i = 0 Then res_r = "["
@@ -641,7 +641,7 @@ End Try
 Print( "~ntest 4.2 - decoding (JSON object.member:string) into (BMX Type.Field:Int)" )
 Try
 	jstr = "{~qvalue~q:~qString Value!~q}"
-	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr, TTypeId.ForName("ExampleMemberObject") ))
+	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr,, TTypeId.ForName("ExampleMemberObject") ))
 	Print "Negative Test FAILED; exception was anticipated"
 Catch ex$
 	Print "Anticipated Exception: "+ex
@@ -651,12 +651,37 @@ End Try
 Print( "~ntest 4.3 - JSON object.member found with no corresponding BMX given Type.Field" )
 Try
 	jstr = "{~qgarbage_member_name~q:~qString Value!~q}"
-	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr, TTypeId.ForName("ExampleMemberObject") ))
+	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr,, TTypeId.ForName("ExampleMemberObject") ))
 	Print "Negative Test FAILED; exception was anticipated"
 Catch ex$
 	Print "Anticipated Exception: "+ex
 End Try
 
+'////////////////////////////////////////
+'////////////////////////////////////////
+'////////////////////////////////////////
+Print( "~n~ntest suite 5 - field mapping" )
 
+'////////////////////////////////////////
+Print( "~ntest 5.1 - encode an object with some fields renamed" )
+Try
+	udt.a = 1
+	udt.b = 2
+	udt.c = 3
+	settings = New TJSONEncodeSettings
+	settings.OverrideFieldName( TTypeId.ForName( "ExampleUserDefinedType" ), "a", "type" )
+	jstr = JSON.Encode( udt, settings );
+	Print( jstr )
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+'////////////////////////////////////////
+Print( "~ntest 5.2 - round trip; decode the object from test 5.1, with fields renamed back to the original names" )
+Try
+	udt = ExampleUserDefinedType( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType") ))
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
 
 

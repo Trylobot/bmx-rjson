@@ -45,14 +45,17 @@ Type JSON
 	End Function
 	
 	' Parse a JSON-String and populate an object
-	Function Decode:Object( encoded_json_data:String, typeId:TTypeId = Null )
+	Function Decode:Object( encoded_json_data:String, settings:TJSONDecodeSettings = Null, typeId:TTypeId = Null )
+		If Not settings
+			settings = New TJSONDecodeSettings
+		End If
 		Local cursor% = 0
 		If typeId
 			Local decoded_object:Object
 			If Not typeId.ElementType() 'non-array type provided
 				Local json_object:TMap = _DecodeJSONObject( encoded_json_data, cursor )
 				If json_object
-					Return _InitializeObject( json_object, typeId )
+					Return _InitializeObject( json_object, settings, typeId )
 				Else
 					Throw( "Error: an object is desired, but an array was found" )
 					Return Null
@@ -60,7 +63,7 @@ Type JSON
 			Else 'array type provided
 				Local json_array:TList = _DecodeJSONArray( encoded_json_data, cursor )
 				If json_array
-					Return _InitializeArray( json_array, typeId )
+					Return _InitializeArray( json_array, settings, typeId )
 				Else
 					Throw( "Error: an array is desired, but an object was found" )
 				End If
@@ -112,7 +115,7 @@ Type JSON
 						For Local source_object_field:TField = EachIn source_object_fields
 							If Not type_metadata.IsFieldIgnored( source_object_field )
 								encoded_json_data :+ STRING_BEGIN
-								encoded_json_data :+ source_object_field.Name()
+								encoded_json_data :+ type_metadata.GetEncodeFieldName( source_object_field.Name() )
 								encoded_json_data :+ STRING_END
 								encoded_json_data :+ PAIR_SEPARATOR
 								If settings.pretty_print Then encoded_json_data :+ " "
@@ -294,7 +297,7 @@ Type JSON
 		Return encoded_json_data
 	End Function
 	
-	Function _InitializeObject:Object( json_object:TMap, type_id:TTypeId )
+	Function _InitializeObject:Object( json_object:TMap, settings:TJSONDecodeSettings, type_id:TTypeId )
 		If type_id = TTypeId.ForName( "TMap" )
 			Return json_object
 		End If
@@ -334,7 +337,7 @@ Type JSON
 							Default 'user defined objects
 								Local json_child_object:TMap = TMap(value)
 								If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
-								object_field.Set( decoded_object, _InitializeObject( json_child_object, object_field_type_id ))
+								object_field.Set( decoded_object, _InitializeObject( json_child_object, settings, object_field_type_id ))
 						End Select
 					Catch ex$
 						Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
@@ -342,7 +345,7 @@ Type JSON
 				Else 'array field type found
 					Local json_child_array:TList = TList(value)
 					If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
-					object_field.Set( decoded_object, _InitializeArray( json_child_array, object_field_type_id ))
+					object_field.Set( decoded_object, _InitializeArray( json_child_array, settings, object_field_type_id ))
 				End If
 			Else
 				Throw( "Error: could not find "+type_id.Name()+"."+key )
@@ -352,7 +355,7 @@ Type JSON
 		Return decoded_object
 	End Function
 	
-	Function _InitializeArray:Object( json_array:TList, type_id:TTypeId )
+	Function _InitializeArray:Object( json_array:TList, settings:TJSONDecodeSettings, type_id:TTypeId )
 		If type_id = TTypeId.ForName( "TList" )
 			Return json_array
 		End If
@@ -391,7 +394,7 @@ Type JSON
 						Default 'user defined objects
 							Local json_child_object:TMap = TMap(value)
 							If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
-							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, element_type_id ))
+							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, settings, element_type_id ))
 					End Select
 				Catch ex$
 					Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
@@ -399,7 +402,7 @@ Type JSON
 			Else 'array element type found
 				Local json_child_array:TList = TList(value)
 				If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
-				type_id.SetArrayElement( decoded_object, index, _InitializeArray( json_child_array, element_type_id ))
+				type_id.SetArrayElement( decoded_object, index, _InitializeArray( json_child_array, settings, element_type_id ))
 			End If
 			index :+ 1
 		Next
@@ -693,8 +696,21 @@ Type TJSONEncodeSettings
 		GetTypeMetadata( type_id ).OverrideFieldType( field_ref, field_type )
 	End Method
 	'////
+	Method OverrideFieldName( type_id:TTypeId, field_name$, new_field_name$ )
+		GetTypeMetadata( type_id ).OverrideFieldName( field_name, new_field_name )
+	End Method
+	'////
 	Method SetCustomEncoder( type_id:TTypeId, custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% ))
 		GetTypeMetadata( type_id ).SetCustomEncoder( custom_encoder )
+	End Method
+End Type
+
+'decoding settings (none yet)
+Type TJSONDecodeSettings
+	'Field metadata:TMap         'maps blitzmax type-ID's to type-specific encoding settings
+	'////
+	Method New()
+		'metadata = CreateMap()
 	End Method
 End Type
 
@@ -703,11 +719,13 @@ Type TJSONTypeSpecificMetadata
 	Field precision:Int             'overrides the setting in the container class for this field only
 	Field ignore_fields:TList       'TList<String> specifies fields to ignore
 	Field field_type_overrides:TMap 'maps blitzmax fields to types (to use as overrides)
+	Field field_name_overrides:TMap 'maps blitzmax type field identifiers to json object field names
 	Field custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% )
 	'////
 	Method New()
 		ignore_fields = CreateList()
 		field_type_overrides = CreateMap()
+		field_name_overrides = CreateMap()
 	End Method
 	'////
 	Method IsFieldIgnored%( field_ref:TField )
@@ -718,8 +736,20 @@ Type TJSONTypeSpecificMetadata
 		Return field_type_overrides.Contains( field_ref )
 	End Method
 	'////
+	Method IsFieldNameOverridden%( field_name$ )
+		Return field_name_overrides.Contains( field_name )
+	End Method
+	'////
 	Method GetFieldTypeOverride:TTypeId( field_ref:TField )
 		Return TTypeId( field_type_overrides.ValueForKey( field_ref ))
+	End Method
+	'////
+	Method GetEncodeFieldName$( field_name$ )
+		If field_name_overrides.Contains( field_name )
+			Return String( field_name_overrides.ValueForKey( field_name ))
+		Else 'nothing has been set for this field
+			Return field_name
+		End If
 	End Method
 	'////
 	Method IgnoreField( field_ref:TField )
@@ -728,6 +758,10 @@ Type TJSONTypeSpecificMetadata
 	'////
 	Method OverrideFieldType( field_ref:TField, field_type:TTypeId )
 		field_type_overrides.Insert( field_ref, field_type )
+	End Method
+	'////
+	Method OverrideFieldName( field_name$, new_field_name$ )
+		field_name_overrides.Insert( field_name, new_field_name )
 	End Method
 	'////
 	Method SetCustomEncoder( custom_encoder:String( source_object:Object, settings:TJSONEncodeSettings, override_type:TTypeId, indent% ))
