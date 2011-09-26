@@ -97,68 +97,72 @@ Type JSON
 					encoded_json_data :+ _StringEscape( source_object.ToString() )
 					encoded_json_data :+ STRING_END
 				Default 'User-Defined-Type
-					encoded_json_data :+ OBJECT_BEGIN
-					Local source_object_fields:TList = CreateList()
-					Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
-					While source_object_super_type_id
-						source_object_super_type_id.EnumFields( source_object_fields )
-						source_object_super_type_id = source_object_super_type_id.SuperType()
-					End While
-					source_object_type_id.EnumFields( source_object_fields )
-					Local field_count% = source_object_fields.Count()
-					If field_count > 0
-						If settings.pretty_print Then encoded_json_data :+ "~n"
-						If settings.pretty_print Then indent :+ 1
-						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-						Local field_index% = 0
-						Local value:Object
-						For Local source_object_field:TField = EachIn source_object_fields
-							If Not type_metadata.IsFieldIgnored( source_object_field )
-								encoded_json_data :+ STRING_BEGIN
-								encoded_json_data :+ type_metadata.GetEncodeFieldName( source_object_field.Name() )
-								encoded_json_data :+ STRING_END
-								encoded_json_data :+ PAIR_SEPARATOR
-								If settings.pretty_print Then encoded_json_data :+ " "
-								Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
-								Local field_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_field_type_id )
-								Local field_override_type:TTypeId = Null
-								If field_type_metadata.IsFieldTypeOverridden( source_object_field )
-									field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
+					If Not source_object
+						encoded_json_data :+ VALUE_NULL
+					Else
+						encoded_json_data :+ OBJECT_BEGIN
+						Local source_object_fields:TList = CreateList()
+						Local source_object_super_type_id:TTypeId = source_object_type_id.SuperType()
+						While source_object_super_type_id
+							source_object_super_type_id.EnumFields( source_object_fields )
+							source_object_super_type_id = source_object_super_type_id.SuperType()
+						End While
+						source_object_type_id.EnumFields( source_object_fields )
+						Local field_count% = source_object_fields.Count()
+						If field_count > 0
+							If settings.pretty_print Then encoded_json_data :+ "~n"
+							If settings.pretty_print Then indent :+ 1
+							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+							Local field_index% = 0
+							Local value:Object
+							For Local source_object_field:TField = EachIn source_object_fields
+								If Not type_metadata.IsFieldIgnored( source_object_field )
+									encoded_json_data :+ STRING_BEGIN
+									encoded_json_data :+ type_metadata.GetEncodeFieldName( source_object_field.Name() )
+									encoded_json_data :+ STRING_END
+									encoded_json_data :+ PAIR_SEPARATOR
+									If settings.pretty_print Then encoded_json_data :+ " "
+									Local source_object_field_type_id:TTypeId = source_object_field.TypeId()
+									Local field_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_field_type_id )
+									Local field_override_type:TTypeId = Null
+									If field_type_metadata.IsFieldTypeOverridden( source_object_field )
+										field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
+									End If
+									If field_type_metadata.IsCustomEncoderDefined()
+										encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
+									Else
+										Select source_object_field_type_id
+											Case ByteTypeId, ..
+											     ShortTypeId, ..
+												   IntTypeId, ..
+											     LongTypeId
+												value = source_object_field.Get( source_object )
+												encoded_json_data :+ String(value) 'value will have already been converted to a string
+											Case FloatTypeId
+												Local value_float:Float = source_object_field.GetFloat( source_object )
+												encoded_json_data :+ TJSONDouble.Create( value_float ).Format( settings.default_precision )
+											Case DoubleTypeId
+												Local value_double:Double = source_object_field.GetDouble( source_object )
+												encoded_json_data :+ TJSONDouble.Create( value_double ).Format( settings.default_precision )
+											Default
+												value = source_object_field.Get( source_object )
+												encoded_json_data :+ Encode( value, settings,, indent )
+										End Select
+									End If
+									If field_index < (field_count - 1) 'Not last member
+										encoded_json_data :+ MEMBER_SEPARATOR
+										If settings.pretty_print Then encoded_json_data :+ "~n"
+										If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+									End If
 								End If
-								If field_type_metadata.IsCustomEncoderDefined()
-									encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
-								Else
-									Select source_object_field_type_id
-										Case ByteTypeId, ..
-										     ShortTypeId, ..
-											   IntTypeId, ..
-										     LongTypeId
-											value = source_object_field.Get( source_object )
-											encoded_json_data :+ String(value) 'value will have already been converted to a string
-										Case FloatTypeId
-											Local value_float:Float = source_object_field.GetFloat( source_object )
-											encoded_json_data :+ TJSONDouble.Create( value_float ).Format( settings.default_precision )
-										Case DoubleTypeId
-											Local value_double:Double = source_object_field.GetDouble( source_object )
-											encoded_json_data :+ TJSONDouble.Create( value_double ).Format( settings.default_precision )
-										Default
-											value = source_object_field.Get( source_object )
-											encoded_json_data :+ Encode( value, settings,, indent )
-									End Select
-								End If
-								If field_index < (field_count - 1) 'Not last member
-									encoded_json_data :+ MEMBER_SEPARATOR
-									If settings.pretty_print Then encoded_json_data :+ "~n"
-									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-								End If
-							End If
-							field_index :+ 1
-						Next
-						If settings.pretty_print Then encoded_json_data :+ "~n"
-						If settings.pretty_print Then indent :- 1
-						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+								field_index :+ 1
+							Next
+							If settings.pretty_print Then encoded_json_data :+ "~n"
+							If settings.pretty_print Then indent :- 1
+							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+						End If
+						encoded_json_data :+ OBJECT_END
 					End If
-					encoded_json_data :+ OBJECT_END
 			End Select
 		Else 'Array type
 			Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
