@@ -317,21 +317,21 @@ Type JSON
 							Case ByteTypeId, ..
 							     ShortTypeId, ..
 							     IntTypeId
-								Local decoded_datum:TJSONLong = TJSONLong(value)
+								Local decoded_datum:TJSONDouble = TJSONDouble(value)
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetInt( decoded_object, decoded_datum.value )
+								object_field.SetInt( decoded_object, Int(decoded_datum.value) )
 							Case LongTypeId
-								Local decoded_datum:TJSONLong = TJSONLong(value)
+								Local decoded_datum:TJSONDouble = TJSONDouble(value)
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetLong( decoded_object, decoded_datum.value )
+								object_field.SetLong( decoded_object, Long(decoded_datum.value) )
 							Case FloatTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetFloat( decoded_object, decoded_datum.value )
+								object_field.SetFloat( decoded_object, Float(decoded_datum.value) )
 							Case DoubleTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
-								object_field.SetDouble( decoded_object, decoded_datum.value )
+								object_field.SetDouble( decoded_object, Double(decoded_datum.value) )
 							Case StringTypeId
 								Local decoded_datum:String = String(value)
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
@@ -571,11 +571,7 @@ Type JSON
 		If (cursor - cursor_start) > 0
 			Local encoded_number$ = encoded_json_data[cursor_start..cursor]
 			If encoded_number And encoded_number.Length > 0
-				If floating_point
-					json_value = TJSONDouble.Create( encoded_number.ToDouble() )
-				Else
-					json_value = TJSONLong.Create( encoded_number.ToLong() )
-				End If
+				json_value = TJSONDouble.Create( encoded_number.ToDouble() )
 			End If
 		End If
 		Return json_value
