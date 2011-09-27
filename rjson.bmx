@@ -307,12 +307,12 @@ Type JSON
 		End If
 		Local decoded_object:Object = type_id.NewObject()
 		For Local key$ = EachIn json_object.Keys()
-			Local object_field:TField = type_id.FindField( key )
+			Local object_field:TField = type_id.FindField( settings.GetTypeMetadata( type_id ).GetEncodeFieldName( key ))
 			If object_field
 				Local value:Object = json_object.ValueForKey( key )
 				Local object_field_type_id:TTypeId = object_field.TypeId()
 				If Not object_field_type_id.ElementType() 'non-array field type found
-					Try
+					'Try
 						Select object_field_type_id
 							Case ByteTypeId, ..
 							     ShortTypeId, ..
@@ -334,7 +334,7 @@ Type JSON
 								object_field.SetDouble( decoded_object, Double(decoded_datum.value) )
 							Case StringTypeId
 								Local decoded_datum:String = String(value)
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								If Not decoded_datum Then object_field.Set( decoded_object, Null )
 								object_field.Set( decoded_object, decoded_datum )
 							Case ObjectTypeId
 								object_field.Set( decoded_object, value )
@@ -343,9 +343,9 @@ Type JSON
 								If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
 								object_field.Set( decoded_object, _InitializeObject( json_child_object, settings, object_field_type_id ))
 						End Select
-					Catch ex$
-						Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
-					End Try
+					'Catch ex$
+					'	Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
+					'End Try
 				Else 'array field type found
 					Local json_child_array:TList = TList(value)
 					If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
@@ -369,16 +369,16 @@ Type JSON
 		Local index% = 0
 		For Local value:Object = EachIn json_array
 			If Not element_type_id.ElementType() 'non-array element type found
-				Try
+				'Try
 					Select element_type_id
 						Case ByteTypeId, ..
 						     ShortTypeId, ..
 						     IntTypeId
-							Local decoded_datum:TJSONLong = TJSONLong(value)
+							Local decoded_datum:TJSONDouble = TJSONDouble(value)
 							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case LongTypeId
-							Local decoded_datum:TJSONLong = TJSONLong(value)
+							Local decoded_datum:TJSONDouble = TJSONDouble(value)
 							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case FloatTypeId
@@ -391,7 +391,7 @@ Type JSON
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case StringTypeId
 							Local decoded_datum:String = String(value)
-							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							If Not decoded_datum Then type_id.SetArrayElement( decoded_object, index, Null )
 							type_id.SetArrayElement( decoded_object, index, decoded_datum )
 						Case ObjectTypeId
 							type_id.SetArrayElement( decoded_object, index, value )
@@ -400,9 +400,9 @@ Type JSON
 							If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
 							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, settings, element_type_id ))
 					End Select
-				Catch ex$
-					Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
-				End Try
+				'Catch ex$
+				'	Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
+				'End Try
 			Else 'array element type found
 				Local json_child_array:TList = TList(value)
 				If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
@@ -440,8 +440,13 @@ Type JSON
 		If char = "-" Or _IsDigit( char )
 			Return _DecodeJSONNumber( encoded_json_data, cursor )
 		End If
+		Select char 'trailing comma, ignore error and continue
+			Case OBJECT_END 
+				Throw("IGNORE")
+			Case ARRAY_END
+				Throw("IGNORE")
+		End Select
 		Throw( "Error: could not parse encoded JSON data at position "+(cursor-1) )
-		Return Null
 	End Function
 	
 	Function _DecodeJSONObject:TMap( encoded_json_data:String, cursor:Int Var )
@@ -456,22 +461,26 @@ Type JSON
 		Local member_pair_name$, member_pair_value:Object
 		Repeat
 			_EatWhitespace( encoded_json_data, cursor )
-			member_pair_name = _DecodeJSONString( encoded_json_data, cursor )
-			_EatWhitespace( encoded_json_data, cursor )
-			char = Chr(encoded_json_data[cursor]); cursor :+ 1
-			If char <> PAIR_SEPARATOR
-				Throw( "Error: expected colon character at position "+(cursor-1) )
-				Return Null
-			End If
-			_EatWhitespace( encoded_json_data, cursor )
-			member_pair_value = _DecodeJSONValue( encoded_json_data, cursor )
-			json_object.Insert( member_pair_name, member_pair_value )
-			_EatWhitespace( encoded_json_data, cursor )
-			char = Chr(encoded_json_data[cursor]); cursor :+ 1
-			If char <> VALUE_SEPARATOR And char <> OBJECT_END
-				Throw( "Error: expected comma or close-curly-brace character at position "+(cursor-1) )
-				Return Null
-			End If
+			Try
+				member_pair_name = _DecodeJSONString( encoded_json_data, cursor )
+				_EatWhitespace( encoded_json_data, cursor )
+				char = Chr(encoded_json_data[cursor]); cursor :+ 1
+				If char <> PAIR_SEPARATOR
+					Throw( "Error: expected colon character at position "+(cursor-1) )
+					Return Null
+				End If
+				_EatWhitespace( encoded_json_data, cursor )
+				member_pair_value = _DecodeJSONValue( encoded_json_data, cursor )
+				json_object.Insert( member_pair_name, member_pair_value )
+				_EatWhitespace( encoded_json_data, cursor )
+				char = Chr(encoded_json_data[cursor]); cursor :+ 1
+				If char <> VALUE_SEPARATOR And char <> OBJECT_END
+					Throw( "Error: expected comma or close-curly-brace character at position "+(cursor-1) )
+					Return Null
+				End If
+			Catch ex$
+				If ex <> "IGNORE" Then Throw ex
+			End Try
 		Until char = OBJECT_END Or cursor >= (encoded_json_data.Length - 1)
 		Return json_object
 	End Function
@@ -488,8 +497,12 @@ Type JSON
 		Local element_value:Object
 		Repeat
 			_EatWhitespace( encoded_json_data, cursor )
-			element_value = _DecodeJSONValue( encoded_json_data, cursor )
-			json_array.AddLast( element_value )
+			Try
+				element_value = _DecodeJSONValue( encoded_json_data, cursor )
+				json_array.AddLast( element_value )
+			Catch ex$ 
+				If ex <> "IGNORE" Then Throw ex
+			End Try
 			_EatWhitespace( encoded_json_data, cursor )
 			char = Chr(encoded_json_data[cursor]); cursor :+ 1
 			If char <> VALUE_SEPARATOR And char <> ARRAY_END
@@ -505,6 +518,12 @@ Type JSON
 		_EatWhitespace( encoded_json_data, cursor )
 		Local char$, char_temp$
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
+		Select char 'trailing comma, ignore error and continue
+			Case OBJECT_END 
+				Throw("IGNORE")
+			Case ARRAY_END
+				Throw("IGNORE")
+		End Select
 		If char <> STRING_BEGIN
 			Throw( "Error: expected quotation character at position "+(cursor-1) )
 			Return Null
@@ -707,10 +726,23 @@ End Type
 
 'decoding settings (none yet)
 Type TJSONDecodeSettings
-	'Field metadata:TMap         'maps blitzmax type-ID's to type-specific encoding settings
+	Field metadata:TMap         'maps blitzmax type-ID's to type-specific encoding settings
 	'////
 	Method New()
-		'metadata = CreateMap()
+		metadata = CreateMap()
+	End Method
+	'////
+	Method GetTypeMetadata:TJSONTypeSpecificMetadata( type_id:TTypeId )
+		Local type_metadata:TJSONTypeSpecificMetadata = TJSONTypeSpecificMetadata( metadata.ValueForKey( type_id ))
+		If Not type_metadata
+			type_metadata = New TJSONTypeSpecificMetadata
+			metadata.Insert( type_id, type_metadata )
+		End If
+		Return type_metadata
+	End Method
+	'////
+	Method OverrideFieldName( type_id:TTypeId, field_name$, new_field_name$ )
+		GetTypeMetadata( type_id ).OverrideFieldName( field_name, new_field_name )
 	End Method
 End Type
 

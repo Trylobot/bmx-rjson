@@ -6,7 +6,7 @@ Import twrc.rjson
 '////////////////////////////////////////
 '////////////////////////////////////////
 '////////////////////////////////////////
-Print( "~n~ntest suite 0 - wrapper types" )
+Print( "~n~ntest suite 0 - internal wrapper types (not desirable for use outside library)" )
 
 '////////////////////////////////////////
 Print( "~ntest 0.1 - null - Null" )
@@ -89,6 +89,7 @@ End Try
 Print( "~n~ntest suite 1 - encoding" )
 Local jstr:String
 Local settings:TJSONEncodeSettings = New TJSONEncodeSettings
+Local d_settings:TJSONDecodeSettings = New TJSONDecodeSettings
 Local type_id:TTypeId
 
 '////////////////////////////////////////
@@ -679,9 +680,61 @@ End Try
 '////////////////////////////////////////
 Print( "~ntest 5.2 - round trip; decode the object from test 5.1, with fields renamed back to the original names" )
 Try
-	udt = ExampleUserDefinedType( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType") ))
+	d_settings.OverrideFieldName( TTypeId.ForName( "ExampleUserDefinedType" ), "type", "a" )
+	udt = ExampleUserDefinedType( JSON.Decode( jstr, d_settings, TTypeId.ForName("ExampleUserDefinedType") ))
+	Print "udt.a = "+udt.a
+	Print "udt.b = "+udt.b
+	Print "udt.c = "+udt.c
 Catch ex$
 	Print "Test FAILED: "+ex
 End Try
+
+'////////////////////////////////////////
+'////////////////////////////////////////
+'////////////////////////////////////////
+Print( "~n~ntest suite 6 - bug re-test" )
+
+'////////////////////////////////////////
+Print( "~ntest 6.1 - decode array with trailing comma" )
+Try
+	jstr = "[ 0, 1, 2, 3, 4, ]"
+	Local ar_int%[] = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]")))
+	res = ""
+	For Local i% = 0 Until ar_int.length
+		If i = 0 Then res = String.FromInt( ar_int[i] ) Else res :+ String.FromInt( ar_int[i] )
+		If i < ar_int.length - 1 Then res :+ ","
+	Next
+	res = "["+res+"]"
+	Print res
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+'////////////////////////////////////////
+Print( "~ntest 6.2 - decode object with trailing comma" )
+Try
+	jstr = "{ ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }"
+	udt = ExampleUserDefinedType( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType") ))
+	Print "udt.a = "+udt.a
+	Print "udt.b = "+udt.b
+	Print "udt.c = "+udt.c
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+'////////////////////////////////////////
+Print( "~ntest 6.3 - decode object with string field and incoming string is empty" )
+Try
+	Type ExampleStringContainer
+		Field name$
+	End Type
+	jstr = "{~qname~q:~q~q}"
+	Local esc:ExampleStringContainer = ExampleStringContainer( JSON.Decode( jstr,, TTypeId.ForName("ExampleStringContainer") ))
+	Print "~q~q --> ~q" + esc.name + "~q"
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+
 
 
