@@ -546,8 +546,6 @@ Type JSON
 						json_string :+ "~q"
 					Case STRING_ESCAPE_REVERSE_SOLIDUS
 						json_string :+ "\"
-					Case STRING_ESCAPE_SOLIDUS
-						json_string :+ "/"
 					Case STRING_ESCAPE_BACKSPACE
 						'ignore
 					Case STRING_ESCAPE_FORMFEED
@@ -628,7 +626,7 @@ Type JSON
 	End Function
 	
 	Function _StringEscape$( str$ )
-		Return str.Replace( "~q", "\~q" ).Replace( "\", "\\" ).Replace( "/", "\/" ).Replace( "~n", "\n" ).Replace( "~r", "\r" ).Replace( "~t", "\t" )  
+		Return str.Replace( "~q", "\~q" ).Replace( "\", "\\" ).Replace( "~n", "\n" ).Replace( "~r", "\r" ).Replace( "~t", "\t" )  
 	End Function
 	
 	Function _RepeatSpace$( count% )
@@ -667,7 +665,7 @@ Type JSON
 	Const STRING_ESCAPE_SEQUENCE_BEGIN$  = "\"
 	Const STRING_ESCAPE_QUOTATION$       = "~q"
 	Const STRING_ESCAPE_REVERSE_SOLIDUS$ = "\"
-	Const STRING_ESCAPE_SOLIDUS$         = "/"
+	'Const STRING_ESCAPE_SOLIDUS$         = "/"
 	Const STRING_ESCAPE_BACKSPACE$       = "b"
 	Const STRING_ESCAPE_FORMFEED$        = "f"
 	Const STRING_ESCAPE_NEWLINE$         = "n"
