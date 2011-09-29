@@ -1,4 +1,4 @@
-' test suite for bmx-rjson
+' test suite For bmx-rjson
 SuperStrict
 Import twrc.rjson
 'Import "rjson.bmx"
@@ -735,6 +735,15 @@ Catch ex$
 	Print "Test FAILED: "+ex
 End Try
 
+'////////////////////////////////////////
+Print( "~ntest 6.4 - mistakenly encoding empty array as empty object" )
+Try
+	Local ix%[] = New Int[0]
+	jstr = JSON.Encode( ix )
+	Print jstr
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
 
 
 

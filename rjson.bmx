@@ -86,11 +86,12 @@ Type JSON
 	'  private
 	'///////////
 	
-	Function _EncodeObject:String( source_object:Object, settings:TJSONEncodeSettings = Null, source_object_type_id:TTypeId = Null, indent% = 0 )
+	Function _EncodeObject:String( source_object:Object, settings:TJSONEncodeSettings, source_object_type_id:TTypeId, indent% = 0 )
 		Local encoded_json_data:String = ""
 		Local type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_type_id )
-		Local is_array% = source_object_type_id.ElementType() <> Null
-		If Not is_array
+		'Local is_array% = source_object_type_id.ElementType <> Null Or source_object_type_id.ExtendsType( ArrayTypeId ) Or source_object_type_id.Name().Contains("[")
+		Local is_array% = source_object_type_id = ArrayTypeId Or source_object_type_id.ExtendsType( ArrayTypeId )
+		If Not is_array 'Non-Array Type
 			Select source_object_type_id
 				Case StringTypeId
 					encoded_json_data :+ STRING_BEGIN
@@ -165,59 +166,69 @@ Type JSON
 					End If
 			End Select
 		Else 'Array type
-			Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
-			Local dimension_lengths%[] = New Int[dimensions]
-			For Local d% = 0 Until dimensions
-				dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
-			Next
-			Local array_length% = source_object_type_id.ArrayLength( source_object )
-			If array_length = 0
+			If Not source_object
 				encoded_json_data :+ ARRAY_BEGIN
 				encoded_json_data :+ ARRAY_END
-			Else 'array_length <> 0
-				Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
-				Local value:Object
-				For Local index% = 0 Until array_length
+			Else
+				Try
+					Local dimensions% = source_object_type_id.ArrayDimensions( source_object )
+					Local dimension_lengths%[] = New Int[dimensions]
 					For Local d% = 0 Until dimensions
-						If index Mod dimension_lengths[d] = 0
-							encoded_json_data :+ ARRAY_BEGIN
-							If settings.pretty_print Then encoded_json_data :+ "~n"
-							If settings.pretty_print Then indent :+ 1
-							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-						End If
+						dimension_lengths[d] = source_object_type_id.ArrayLength( source_object, d )
 					Next
-					value = source_object_type_id.GetArrayElement( source_object, index )
-					Local element_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_element_type_id )
-					If element_type_metadata.IsCustomEncoderDefined()
-						encoded_json_data :+ element_type_metadata.custom_encoder( value, settings, Null, indent )
-					Else
-						Select source_object_element_type_id
-							Case ByteTypeId, ..
-							     ShortTypeId, ..
-								   IntTypeId, ..
-							     LongTypeId
-								encoded_json_data :+ String(value) 'value will have already been converted to a string
-							Case FloatTypeId, ..
-							     DoubleTypeId
-								encoded_json_data :+ TJSONDouble.Create( String(value).ToDouble() ).Format( settings.default_precision )
-							Default
-								encoded_json_data :+ Encode( value, settings,, indent )
-						End Select
-					End If
-					For Local d% = (dimensions-1) To 0 Step -1
-						If (index + 1) Mod dimension_lengths[d] = 0
-							If settings.pretty_print Then encoded_json_data :+ "~n"
-							If settings.pretty_print Then indent :- 1
-							If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-							encoded_json_data :+ ARRAY_END
-						End If
-					Next
-					If index < (array_length - 1)
-						encoded_json_data :+ VALUE_SEPARATOR
-						If settings.pretty_print Then encoded_json_data :+ "~n"
-						If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
-					End If
-				Next
+					Local array_length% = source_object_type_id.ArrayLength( source_object )
+					If array_length = 0
+						encoded_json_data :+ ARRAY_BEGIN
+						encoded_json_data :+ ARRAY_END
+					Else 'array_length <> 0
+						Local source_object_element_type_id:TTypeId = source_object_type_id.ElementType()
+						Local value:Object
+						For Local index% = 0 Until array_length
+							For Local d% = 0 Until dimensions
+								If index Mod dimension_lengths[d] = 0
+									encoded_json_data :+ ARRAY_BEGIN
+									If settings.pretty_print Then encoded_json_data :+ "~n"
+									If settings.pretty_print Then indent :+ 1
+									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+								End If
+							Next
+							value = source_object_type_id.GetArrayElement( source_object, index )
+							Local element_type_metadata:TJSONTypeSpecificMetadata = settings.GetTypeMetadata( source_object_element_type_id )
+							If element_type_metadata.IsCustomEncoderDefined()
+								encoded_json_data :+ element_type_metadata.custom_encoder( value, settings, Null, indent )
+							Else
+								Select source_object_element_type_id
+									Case ByteTypeId, ..
+									     ShortTypeId, ..
+										   IntTypeId, ..
+									     LongTypeId
+										encoded_json_data :+ String(value) 'value will have already been converted to a string
+									Case FloatTypeId, ..
+									     DoubleTypeId
+										encoded_json_data :+ TJSONDouble.Create( String(value).ToDouble() ).Format( settings.default_precision )
+									Default
+										encoded_json_data :+ Encode( value, settings,, indent )
+								End Select
+							End If
+							For Local d% = (dimensions-1) To 0 Step -1
+								If (index + 1) Mod dimension_lengths[d] = 0
+									If settings.pretty_print Then encoded_json_data :+ "~n"
+									If settings.pretty_print Then indent :- 1
+									If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+									encoded_json_data :+ ARRAY_END
+								End If
+							Next
+							If index < (array_length - 1)
+								encoded_json_data :+ VALUE_SEPARATOR
+								If settings.pretty_print Then encoded_json_data :+ "~n"
+								If settings.pretty_print Then encoded_json_data :+ _RepeatSpace( indent*settings.tab_size )
+							End If
+						Next
+					End If					
+				Catch ex$
+					encoded_json_data :+ ARRAY_BEGIN
+					encoded_json_data :+ ARRAY_END
+				End Try
 			End If
 		End If
 		Return encoded_json_data
