@@ -711,7 +711,7 @@ Catch ex$
 End Try
 
 '////////////////////////////////////////
-Print( "~ntest 6.2 - decode object with trailing comma" )
+Print( "~ntest 6.2.1 - decode object with trailing comma" )
 Try
 	jstr = "{ ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }"
 	udt = ExampleUserDefinedType( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType") ))
@@ -723,13 +723,28 @@ Catch ex$
 End Try
 
 '////////////////////////////////////////
-Print( "~ntest 6.2 b - decode object with trailing comma, which is part of a larger array also with a trailing comma" )
+Print( "~ntest 6.2.2 - decode object with trailing comma, which is part of a larger array also with a trailing comma" )
 Try
 	jstr = "[ { ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }, ]"
 	Local udt_arr:ExampleUserDefinedType[] = ExampleUserDefinedType[]( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType[]") ))
 	Print "udt_arr[0].a = "+udt_arr[0].a
 	Print "udt_arr[0].b = "+udt_arr[0].b
 	Print "udt_arr[0].c = "+udt_arr[0].c
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+'////////////////////////////////////////
+Print( "~ntest 6.2.3 - decode array with trailing comma, which is part of a larger object also with a trailing comma" )
+Type ExampleUserDefinedType2 
+	Field a%[]
+EndType
+Try
+	jstr = "{ ~qa~q: [ 1, 2, 3, ], }"
+	Local udt2:ExampleUserDefinedType2 = ExampleUserDefinedType2( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType2") ))
+	Print "udt2.a[0] = "+udt2.a[0]
+	Print "udt2.a[1] = "+udt2.a[1]
+	Print "udt2.a[2] = "+udt2.a[2]
 Catch ex$
 	Print "Test FAILED: "+ex
 End Try

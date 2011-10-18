@@ -464,35 +464,39 @@ Type JSON
 		Local json_object:TMap = CreateMap()
 		_EatWhitespace( encoded_json_data, cursor )
 		Local char$
+		If cursor >= (encoded_json_data.Length) Then Return Null
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
 		If char <> OBJECT_BEGIN
-			Throw( "Error: expected open-curly-brace character at position "+(cursor-1) )
+			Throw( "Error: expected open-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Local member_pair_name$, member_pair_value:Object
-		Repeat
-			_EatWhitespace( encoded_json_data, cursor )
-			Try
+		Try
+			Repeat
+				_EatWhitespace( encoded_json_data, cursor )
 				member_pair_name = _DecodeJSONString( encoded_json_data, cursor )
 				_EatWhitespace( encoded_json_data, cursor )
+				If cursor >= (encoded_json_data.Length) Then Exit
 				char = Chr(encoded_json_data[cursor]); cursor :+ 1
 				If char <> PAIR_SEPARATOR
-					Throw( "Error: expected colon character at position "+(cursor-1) )
+					Throw( "Error: expected colon character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 					Return Null
 				End If
 				_EatWhitespace( encoded_json_data, cursor )
 				member_pair_value = _DecodeJSONValue( encoded_json_data, cursor )
 				json_object.Insert( member_pair_name, member_pair_value )
 				_EatWhitespace( encoded_json_data, cursor )
+				If cursor >= (encoded_json_data.Length) Then Exit
 				char = Chr(encoded_json_data[cursor]); cursor :+ 1
 				If char <> VALUE_SEPARATOR And char <> OBJECT_END
-					Throw( "Error: expected comma or close-curly-brace character at position "+(cursor-1) )
+					Throw( "Error: expected comma or close-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 					Return Null
 				End If
-			Catch ex$
-				If ex <> "IGNORE" Then Throw ex
-			End Try
-		Until char = OBJECT_END Or cursor >= (encoded_json_data.Length - 1)
+			Until char = OBJECT_END Or cursor >= (encoded_json_data.Length - 1)
+		Catch ex$
+			If ex = "IGNORE" Then DebugLog "Warning: trailing comma ignored" ..
+			Else Throw ex
+		End Try
 		Return json_object
 	End Function
 	
@@ -500,9 +504,10 @@ Type JSON
 		Local json_array:TList = CreateList()
 		_EatWhitespace( encoded_json_data, cursor )
 		Local char$
+		If cursor >= (encoded_json_data.Length) Then Return Null
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
 		If char <> ARRAY_BEGIN
-			Throw( "Error: expected open-square-bracket character at position "+(cursor-1) )
+			Throw( "Error: expected open-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Local element_value:Object
@@ -512,12 +517,14 @@ Type JSON
 				element_value = _DecodeJSONValue( encoded_json_data, cursor )
 				json_array.AddLast( element_value )
 			Catch ex$ 
-				If ex <> "IGNORE" Then Throw ex
+				If ex = "IGNORE" Then DebugLog "Warning: trailing comma ignored" ..
+				Else Throw ex
 			End Try
 			_EatWhitespace( encoded_json_data, cursor )
+			If cursor >= (encoded_json_data.Length) Then Exit
 			char = Chr(encoded_json_data[cursor]); cursor :+ 1
 			If char <> VALUE_SEPARATOR And char <> ARRAY_END
-				Throw( "Error: expected comma or close-square-bracket character at position "+(cursor-1) )
+				Throw( "Error: expected comma or close-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 				Return Null
 			End If
 		Until char = ARRAY_END Or cursor >= (encoded_json_data.Length - 1)
@@ -528,6 +535,7 @@ Type JSON
 		Local json_string$ = ""
 		_EatWhitespace( encoded_json_data, cursor )
 		Local char$, char_temp$
+		If cursor >= (encoded_json_data.Length) Then Return Null
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
 		Select char 'trailing comma, ignore error and continue
 			Case OBJECT_END 
@@ -536,7 +544,7 @@ Type JSON
 				Throw("IGNORE")
 		End Select
 		If char <> STRING_BEGIN
-			Throw( "Error: expected quotation character at position "+(cursor-1) )
+			Throw( "Error: expected quotation character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Repeat
@@ -634,6 +642,10 @@ Type JSON
 			Throw( "Error: expected at least "+require+" characters from the set ["+char_filter+"]" )
 		End If
 		Return cursor - cursor_start
+	End Function
+
+	Function _ShowPosition$( encoded_json_data$, cursor% )
+		Return "~n"+encoded_json_data[cursor-6..cursor+5]+"~n"+_RepeatSpace(5)+"^"
 	End Function
 	
 	Function _StringEscape$( str$ )
