@@ -723,6 +723,18 @@ Catch ex$
 End Try
 
 '////////////////////////////////////////
+Print( "~ntest 6.2 b - decode object with trailing comma, which is part of a larger array also with a trailing comma" )
+Try
+	jstr = "[ { ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }, ]"
+	Local udt_arr:ExampleUserDefinedType[] = ExampleUserDefinedType[]( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType[]") ))
+	Print "udt_arr[0].a = "+udt_arr[0].a
+	Print "udt_arr[0].b = "+udt_arr[0].b
+	Print "udt_arr[0].c = "+udt_arr[0].c
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+'////////////////////////////////////////
 Print( "~ntest 6.3 - decode object with string field and incoming string is empty" )
 Try
 	Type ExampleStringContainer
