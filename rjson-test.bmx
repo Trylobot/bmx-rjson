@@ -773,5 +773,37 @@ Catch ex$
 End Try
 
 
+'////////////////////////////////////////
+Print( "~ntest 7.1 - # comment" )
+Try
+	jstr = "{~qname~q:~qTyler~q, # this is the name of a guy ~n~qsex~q:~qM~q, ~qage~q:26 }"
+	Type TheGuy
+		Field name$
+		Field sex$
+		Field age#
+	EndType
+	Local guy:TheGuy = TheGuy( JSON.Decode( jstr,, TTypeId.ForName("TheGuy") ))
+	Print "age --> "+guy.age
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+
+'////////////////////////////////////////
+Print( "~ntest 7.2 - implicit type conversion" )
+Try
+	jstr = "{~q_int~q:5,~q_float~q:2.5,~q_str_int~q:~q9~q,~q_str_float~q:~q7.75~q}"
+	Type Imp
+		Field _int$
+		Field _float$
+		Field _str_int%
+		Field _str_float#
+	EndType
+	Local obj:Imp = Imp( JSON.Decode( jstr,, TTypeId.ForName("Imp") ))
+	Print JSON.Encode( obj )
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
 
 

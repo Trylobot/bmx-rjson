@@ -1,6 +1,6 @@
 CALL prep
 
-CALL deploy_w
+CALL deploy
 
 CALL build
 

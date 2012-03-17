@@ -4,6 +4,7 @@
 '   written according to the JSON specification http://www.json.org
 '   with the following minor modifications(s):
 '   - when decoding, it is okay for numbers to have any number of leading zeroes
+'   - when decoding, the '#' character outside of a string is treated as a single-line comment
 
 SuperStrict
 Module twrc.rjson
@@ -329,24 +330,57 @@ Type JSON
 							     ShortTypeId, ..
 							     IntTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum
+									Local temp_datum:String = String(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
+									End If
+								End If
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetInt( decoded_object, Int(decoded_datum.value) )
 							Case LongTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum
+									Local temp_datum:String = String(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
+									End If
+								End If
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetLong( decoded_object, Long(decoded_datum.value) )
 							Case FloatTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum
+									Local temp_datum:String = String(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
+									End If
+								End If
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetFloat( decoded_object, Float(decoded_datum.value) )
 							Case DoubleTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
+								If Not decoded_datum
+									Local temp_datum:String = String(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
+									End If
+								End If
 								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetDouble( decoded_object, Double(decoded_datum.value) )
 							Case StringTypeId
 								Local decoded_datum:String = String(value)
-								If Not decoded_datum Then object_field.Set( decoded_object, Null )
-								object_field.Set( decoded_object, decoded_datum )
+								If Not decoded_datum
+									Local temp_datum:TJSONDouble = TJSONDouble(value)
+									If temp_datum
+										decoded_datum = temp_datum.Format( settings.default_precision )
+									End If
+								End If
+								If Not decoded_datum 
+									object_field.Set( decoded_object, Null )
+								Else
+									object_field.Set( decoded_object, decoded_datum )
+								End If
 							Case ObjectTypeId
 								object_field.Set( decoded_object, value )
 							Default 'user defined objects
@@ -615,8 +649,19 @@ Type JSON
 	
 	Function _EatWhitespace( str:String, cursor:Int Var )
 		' advance cursor to first printable character
-		While cursor < str.Length And Not _IsPrintable( Chr( str[cursor] ))
-			cursor :+ 1
+		Local cursor_char$, comment% = false
+		While cursor < str.Length
+			cursor_char = Chr( str[cursor] )
+			If Chr( str[cursor] ) = "#"
+				comment = true
+			Else If Chr( str[cursor] ) = "~r" Or Chr( str[cursor] ) = "~n"
+				comment = false
+			End If
+			If comment Or Not _IsPrintable( cursor_char )
+				cursor :+ 1
+			Else
+				Exit 'done
+			End If
 		End While
 	End Function
 	
@@ -747,9 +792,11 @@ End Type
 
 'decoding settings (none yet)
 Type TJSONDecodeSettings
+	Field default_precision:Int 'only used during implicit type conversion from double to string
 	Field metadata:TMap         'maps blitzmax type-ID's to type-specific encoding settings
 	'////
 	Method New()
+		default_precision = -1
 		metadata = CreateMap()
 	End Method
 	'////
