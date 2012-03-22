@@ -397,8 +397,7 @@ Type JSON
 					object_field.Set( decoded_object, _InitializeArray( json_child_array, settings, object_field_type_id ))
 				End If
 			Else
-				Throw( "Error: could not find "+type_id.Name()+"."+key )
-				Return Null
+				'Ignore this error, there was extra data
 			End If
 		Next
 		Return decoded_object

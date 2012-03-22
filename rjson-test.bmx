@@ -806,4 +806,39 @@ Catch ex$
 End Try
 
 
+'////////////////////////////////////////
+'Print( "~ntest 7.3 - implicit type conversion on array elements" )
+Try
+	Rem
+	jstr = "[1,1.5,~q5~q,~q5.5~q]"
+	Type Imp
+		Field _int$
+		Field _float$
+		Field _str_int%
+		Field _str_float#
+	EndType
+	Local obj:Imp = Imp( JSON.Decode( jstr,, TTypeId.ForName("Imp") ))
+	Print JSON.Encode( obj )
+	EndRem
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+
+Rem
+'////////////////////////////////////////
+Print( "~ntest 7.4 - ignored decoded fields by name" )
+Try
+	jstr = "{~qa~q:1,~qb~q:2}"
+	Type SimpleType1
+		Field a%
+	EndType
+	Local ds:TJSONDecodeSettings = New TJSONDecodeSettings
+	ds.IgnoreFieldName( TTypeId.ForName("SimpleType1"), "b" )
+	Local s:SimpleType1 = SimpleType1( JSON.Decode( jstr, ds, TTypeId.ForName("SimpleType1") ))
+	Print JSON.Encode( s )
+Catch ex$
+	Print "Test FAILED: "+ex
+End Try
+EndRem
+
 
