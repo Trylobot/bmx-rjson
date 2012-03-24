@@ -134,6 +134,7 @@ Type JSON
 										field_override_type = field_type_metadata.GetFieldTypeOverride( source_object_field )
 									End If
 									If field_type_metadata.IsCustomEncoderDefined()
+										value = source_object_field.Get( source_object )
 										encoded_json_data :+ field_type_metadata.custom_encoder( value, settings, field_override_type, indent )
 									Else
 										Select source_object_field_type_id
