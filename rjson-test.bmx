@@ -842,3 +842,37 @@ End Try
 EndRem
 
 
+'////////////////////////////////////////
+Print( "~ntest 8.1 - Encoding Object whose fields are a TList and a TMap" )
+Try
+	Type Complex
+		Field list:TList
+		Field map:TMap
+	EndType
+	Local c:Complex = New Complex
+	c.list = CreateList()
+	c.list.AddLast( "listval1" )
+	c.list.AddLast( "listval2" )
+	c.map = CreateMap()
+	c.map.Insert( "key1", "mapval1" )
+	c.map.Insert( "key2", "mapval2" )
+	Print JSON.Encode( c )
+Catch ex$
+	Print "Test FAILED with Exception: "+ex
+End Try
+
+'////////////////////////////////////////
+Print( "~ntest 8.2 - Encoding Array whose elements are a TList and a TMap" )
+Try
+	Local a:Object[] = New Object[2]
+	Local list:TList = CreateList()
+	list.AddLast( "listval1" )
+	list.AddLast( "listval2" )
+	Local map:TMap = CreateMap()
+	map.Insert( "key1", "mapval1" )
+	map.Insert( "key2", "mapval2" )
+	Print JSON.Encode( a )
+Catch ex$
+	Print "Test FAILED with Exception: "+ex
+End Try
+

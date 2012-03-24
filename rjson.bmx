@@ -5,6 +5,9 @@
 '   with the following minor modifications(s):
 '   - when decoding, it is okay for numbers to have any number of leading zeroes
 '   - when decoding, the '#' character outside of a string is treated as a single-line comment
+'   - when decoding, it is okay for string values to be unquoted, as long as they only contain the following characters:
+'     A-Za-z_0-9, and do not start with a number
+'   - when decoding, a semicolon is an acceptable substitute for a comma
 
 SuperStrict
 Module twrc.rjson
@@ -58,7 +61,7 @@ Type JSON
 				If json_object
 					Return _InitializeObject( json_object, settings, typeId )
 				Else
-					Throw( "Error: an object is desired, but an array was found" )
+					Throw( " Error: an object is desired, but an array was found" )
 					Return Null
 				End If
 			Else 'array type provided
@@ -66,7 +69,7 @@ Type JSON
 				If json_array
 					Return _InitializeArray( json_array, settings, typeId )
 				Else
-					Throw( "Error: an array is desired, but an object was found" )
+					Throw( " Error: an array is desired, but an object was found" )
 				End If
 			End If
 			Return decoded_object
@@ -336,7 +339,13 @@ Type JSON
 										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
 									End If
 								End If
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								If Not decoded_datum
+									Local temp_datum:TJSONBoolean = TJSONBoolean(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.value )
+									End If
+								End If
+								If Not decoded_datum Then Throw " Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetInt( decoded_object, Int(decoded_datum.value) )
 							Case LongTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
@@ -346,7 +355,13 @@ Type JSON
 										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
 									End If
 								End If
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								If Not decoded_datum
+									Local temp_datum:TJSONBoolean = TJSONBoolean(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.value )
+									End If
+								End If
+								If Not decoded_datum Then Throw " Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetLong( decoded_object, Long(decoded_datum.value) )
 							Case FloatTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
@@ -356,7 +371,13 @@ Type JSON
 										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
 									End If
 								End If
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								If Not decoded_datum
+									Local temp_datum:TJSONBoolean = TJSONBoolean(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.value )
+									End If
+								End If
+								If Not decoded_datum Then Throw " Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetFloat( decoded_object, Float(decoded_datum.value) )
 							Case DoubleTypeId
 								Local decoded_datum:TJSONDouble = TJSONDouble(value)
@@ -366,7 +387,13 @@ Type JSON
 										decoded_datum = TJSONDouble.Create( temp_datum.ToDouble() )
 									End If
 								End If
-								If Not decoded_datum Then Throw "Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
+								If Not decoded_datum
+									Local temp_datum:TJSONBoolean = TJSONBoolean(value)
+									If temp_datum
+										decoded_datum = TJSONDouble.Create( temp_datum.value )
+									End If
+								End If
+								If Not decoded_datum Then Throw " Error: attempt to assign to field "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name()+" with value "+ObjectInfo(value)
 								object_field.SetDouble( decoded_object, Double(decoded_datum.value) )
 							Case StringTypeId
 								Local decoded_datum:String = String(value)
@@ -385,19 +412,20 @@ Type JSON
 								object_field.Set( decoded_object, value )
 							Default 'user defined objects
 								Local json_child_object:TMap = TMap(value)
-								If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
+								If Not json_child_object Then Throw( " Error: an object is desired, but something else was found: "+ObjectInfo(value) )
 								object_field.Set( decoded_object, _InitializeObject( json_child_object, settings, object_field_type_id ))
 						End Select
 					'Catch ex$
-					'	Throw( "Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
+					'	Throw( " Error: could not assign decoded object member ("+ObjectInfo(value)+") to "+type_id.Name()+"."+object_field.Name()+":"+object_field_type_id.Name() )
 					'End Try
 				Else 'array field type found
 					Local json_child_array:TList = TList(value)
-					If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
+					If Not json_child_array Then Throw( " Error: an array is desired, but something else was found: "+ObjectInfo(value) )
 					object_field.Set( decoded_object, _InitializeArray( json_child_array, settings, object_field_type_id ))
 				End If
 			Else
 				'Ignore this error, there was extra data
+				DebugLog( " Warning: field "+key+" not found in type "+type_id.Name())
 			End If
 		Next
 		Return decoded_object
@@ -419,19 +447,19 @@ Type JSON
 						     ShortTypeId, ..
 						     IntTypeId
 							Local decoded_datum:TJSONDouble = TJSONDouble(value)
-							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							If Not decoded_datum Then Throw " Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case LongTypeId
 							Local decoded_datum:TJSONDouble = TJSONDouble(value)
-							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							If Not decoded_datum Then Throw " Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case FloatTypeId
 							Local decoded_datum:TJSONDouble = TJSONDouble(value)
-							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							If Not decoded_datum Then Throw " Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case DoubleTypeId
 							Local decoded_datum:TJSONDouble = TJSONDouble(value)
-							If Not decoded_datum Then Throw "Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
+							If Not decoded_datum Then Throw " Error: attempt to assign to array element "+element_type_id.Name()+"["+index+"] with value "+ObjectInfo(value)
 							type_id.SetArrayElement( decoded_object, index, decoded_datum.ToString() )
 						Case StringTypeId
 							Local decoded_datum:String = String(value)
@@ -441,15 +469,15 @@ Type JSON
 							type_id.SetArrayElement( decoded_object, index, value )
 						Default 'user defined objects
 							Local json_child_object:TMap = TMap(value)
-							If Not json_child_object Then Throw( "Error: an object is desired, but something else was found: "+ObjectInfo(value) )
+							If Not json_child_object Then Throw( " Error: an object is desired, but something else was found: "+ObjectInfo(value) )
 							type_id.SetArrayElement( decoded_object, index, _InitializeObject( json_child_object, settings, element_type_id ))
 					End Select
 				'Catch ex$
-				'	Throw( "Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
+				'	Throw( " Error: could not assign decoded array element ("+ObjectInfo(value)+") to "+type_id.ElementType().Name()+"["+index+"]" )
 				'End Try
 			Else 'array element type found
 				Local json_child_array:TList = TList(value)
-				If Not json_child_array Then Throw( "Error: an array is desired, but something else was found: "+ObjectInfo(value) )
+				If Not json_child_array Then Throw( " Error: an array is desired, but something else was found: "+ObjectInfo(value) )
 				type_id.SetArrayElement( decoded_object, index, _InitializeArray( json_child_array, settings, element_type_id ))
 			End If
 			index :+ 1
@@ -490,7 +518,17 @@ Type JSON
 			Case ARRAY_END
 				Throw("IGNORE")
 		End Select
-		Throw( "Error: could not parse encoded JSON data at position "+(cursor-1) )
+		If _IsAlphaNumericOrUnderscore( encoded_json_data[cursor] )
+			Local try_unquoted_string$ = _DecodeJSONUnquotedString( encoded_json_data, cursor )
+			If try_unquoted_string Then Return try_unquoted_string
+		EndIf
+		Select char 'trailing comma, ignore error and continue
+			Case OBJECT_END 
+				Throw("IGNORE")
+			Case ARRAY_END
+				Throw("IGNORE")
+		End Select
+		Throw( " Error: could not parse encoded JSON data at position "+(cursor-1) )
 	End Function
 	
 	Function _DecodeJSONObject:TMap( encoded_json_data:String, cursor:Int Var )
@@ -500,7 +538,7 @@ Type JSON
 		If cursor >= (encoded_json_data.Length) Then Return Null
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
 		If char <> OBJECT_BEGIN
-			Throw( "Error: expected open-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+			Throw( " Error: expected open-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Local member_pair_name$, member_pair_value:Object
@@ -512,7 +550,7 @@ Type JSON
 				If cursor >= (encoded_json_data.Length) Then Exit
 				char = Chr(encoded_json_data[cursor]); cursor :+ 1
 				If char <> PAIR_SEPARATOR
-					Throw( "Error: expected colon character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+					Throw( " Error: expected colon character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 					Return Null
 				End If
 				_EatWhitespace( encoded_json_data, cursor )
@@ -521,14 +559,15 @@ Type JSON
 				_EatWhitespace( encoded_json_data, cursor )
 				If cursor >= (encoded_json_data.Length) Then Exit
 				char = Chr(encoded_json_data[cursor]); cursor :+ 1
-				If char <> VALUE_SEPARATOR And char <> OBJECT_END
-					Throw( "Error: expected comma or close-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+				If char <> VALUE_SEPARATOR And char <> VALUE_SEPARATOR_ALTERNATE And char <> OBJECT_END
+					Throw( " Error: expected comma or semicolon or close-curly-brace character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 					Return Null
 				End If
 			Until char = OBJECT_END Or cursor >= (encoded_json_data.Length - 1)
 		Catch ex$
-			If ex = "IGNORE" Then DebugLog "Warning: trailing comma ignored" ..
-			Else Throw ex
+			'If ex = "IGNORE" Then DebugLog " Warning: trailing comma ignored" ..
+			'Else Throw ex
+			If ex <> "IGNORE" Then Throw ex
 		End Try
 		Return json_object
 	End Function
@@ -540,7 +579,7 @@ Type JSON
 		If cursor >= (encoded_json_data.Length) Then Return Null
 		char = Chr(encoded_json_data[cursor]); cursor :+ 1
 		If char <> ARRAY_BEGIN
-			Throw( "Error: expected open-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+			Throw( " Error: expected open-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Local element_value:Object
@@ -550,14 +589,15 @@ Type JSON
 				element_value = _DecodeJSONValue( encoded_json_data, cursor )
 				json_array.AddLast( element_value )
 			Catch ex$ 
-				If ex = "IGNORE" Then DebugLog "Warning: trailing comma ignored" ..
-				Else Throw ex
+				'If ex = "IGNORE" Then DebugLog " Warning: trailing comma ignored" ..
+				'Else Throw ex
+				If ex <> "IGNORE" Then Throw ex
 			End Try
 			_EatWhitespace( encoded_json_data, cursor )
 			If cursor >= (encoded_json_data.Length) Then Exit
 			char = Chr(encoded_json_data[cursor]); cursor :+ 1
-			If char <> VALUE_SEPARATOR And char <> ARRAY_END
-				Throw( "Error: expected comma or close-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+			If char <> VALUE_SEPARATOR And char <> VALUE_SEPARATOR_ALTERNATE And char <> ARRAY_END
+				Throw( " Error: expected comma or semicolon or close-square-bracket character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 				Return Null
 			End If
 		Until char = ARRAY_END Or cursor >= (encoded_json_data.Length - 1)
@@ -577,7 +617,7 @@ Type JSON
 				Throw("IGNORE")
 		End Select
 		If char <> STRING_BEGIN
-			Throw( "Error: expected quotation character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
+			Throw( " Error: expected quotation character at position "+(cursor-1)+_ShowPosition(encoded_json_data, cursor) )
 			Return Null
 		End If
 		Repeat
@@ -589,7 +629,7 @@ Type JSON
 				json_string :+ char
 			Else
 				If cursor >= (encoded_json_data.Length - 1)
-					Throw( "Error: unterminated string literal" )
+					Throw( " Error: unterminated string literal" )
 					Return Null
 				End If
 				char_temp = Chr(encoded_json_data[cursor]); cursor :+ 1
@@ -612,11 +652,31 @@ Type JSON
 						'ignore
 						cursor :+ 4
 					Default
-						Throw( "Error: bad string escape sequence at position "+(cursor-1) )
+						Throw( " Error: bad string escape sequence at position "+(cursor-1) )
 						Return Null
 				End Select
 			End If
 		Until cursor >= (encoded_json_data.Length - 1)
+		Return json_string
+	End Function
+
+	Function _DecodeJSONUnquotedString:String( encoded_json_data:String, cursor:Int Var )
+		Local json_string$ = ""
+		_EatWhitespace( encoded_json_data, cursor )
+		Local char$
+		If cursor >= (encoded_json_data.Length) Then Return Null
+		char = Chr( encoded_json_data[cursor] );
+		cursor :+ 1
+		json_string :+ char
+		Repeat
+			char = Chr( encoded_json_data[cursor] );
+			If Not _IsAlphaNumericOrUnderscore( char )
+				Exit
+			End If
+			cursor :+ 1
+			json_string :+ char
+		Until cursor >= (encoded_json_data.Length - 1)
+		'DebugLog " Notify: Unquoted string found: "+json_string
 		Return json_string
 	End Function
 	
@@ -683,7 +743,7 @@ Type JSON
 			End If
 		End While
 		If require <> -1 And (cursor - cursor_start) < require
-			Throw( "Error: expected at least "+require+" characters from the set ["+char_filter+"]" )
+			Throw( " Error: expected at least "+require+" characters from the set ["+char_filter+"]" )
 		End If
 		Return cursor - cursor_start
 	End Function
@@ -707,8 +767,16 @@ Type JSON
 	
 	Function _IsAlpha%( char$ )
 		Local ascii_code% = Asc( char )
-		Return ascii_code >= Asc( "A" ) And ascii_code <= Asc( "Z" ) ..
-		Or     ascii_code >= Asc( "a" ) And ascii_code <= Asc( "z" )
+		Return (ascii_code >= Asc( "A" ) And ascii_code <= Asc( "Z" )) ..
+		Or     (ascii_code >= Asc( "a" ) And ascii_code <= Asc( "z" ))
+	End Function
+
+	Function _IsAlphaNumericOrUnderscore%( char$ )
+		Local ascii_code% = Asc( char )
+		Return (ascii_code >= Asc( "A" ) And ascii_code <= Asc( "Z" )) ..
+		Or     (ascii_code >= Asc( "a" ) And ascii_code <= Asc( "z" )) ..
+		Or     (ascii_code >= Asc( "0" ) And ascii_code <= Asc( "9" )) ..
+		Or     ascii_code =  Asc( "_" )		
 	End Function
 	
 	Function _IsPrintable%( char$ )
@@ -724,6 +792,7 @@ Type JSON
 	Const ARRAY_BEGIN$                   = "["
 	Const ARRAY_END$                     = "]"
 	Const VALUE_SEPARATOR$               = ","
+	Const VALUE_SEPARATOR_ALTERNATE$     = ";"
 	Const VALUE_TRUE$                    = "true"
 	Const VALUE_FALSE$                   = "false"
 	Const VALUE_NULL$                    = "null"
