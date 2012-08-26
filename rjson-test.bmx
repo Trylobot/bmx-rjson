@@ -1,878 +1,710 @@
-' test suite For bmx-rjson
+'test for rjson2.bmx
+' derived from tests in the jsonlint github project
 SuperStrict
 Import twrc.rjson
-'Import "rjson.bmx"
 
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 0 - internal wrapper types (not desirable for use outside library)" )
+Global test_dir$ = "test"
 
-'////////////////////////////////////////
-Print( "~ntest 0.1 - null - Null" )
-Try
-	Print JSON.Encode( Null )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+'var fs = require("fs"),
+''    assert = require("assert"),
+''    parser = require("../lib/jsonlint").parser;
 
-'////////////////////////////////////////
-Print( "~ntest 0.2 - boolean - (JSON only)" )
-Try
-	Local b:TJSONBoolean
-	b = TJSONBoolean.Create( True )
-	Print JSON.Encode( b )
-	b = TJSONBoolean.Create( False )
-	Print JSON.Encode( b )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+json.formatted = False
+json.empty_container_as_null = True
 
-'////////////////////////////////////////
-Print( "~ntest 0.3 - number - (Byte/Short/Int/Long)" )
-Try
-	Local nl:TJSONLong
-	nl = TJSONLong.Create( Byte(85) )
-	Print JSON.Encode( nl )
-	nl = TJSONLong.Create( Short(85) )
-	Print JSON.Encode( nl )
-	nl = TJSONLong.Create( Int(85) )
-	Print JSON.Encode( nl )
-	nl = TJSONLong.Create( Long(85) )
-	Print JSON.Encode( nl )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_object()
+	Print "*** test_object"
+	Local json_str$ = "{~qfoo~q: ~qbar~q}"
+	Local val:TString = New TString
+	val.value = "bar"
+	Local obj:TObject = New TObject
+	obj.fields.Insert( "foo", val )
+	Local json_obj:TValue = TValue( json.parse( json_str ))
+	verify( json_obj.Equals( obj ), json_obj.ToString()+"~n"+obj.ToString() )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 0.4 - number - (Float/Double)" )
-Try
-	Local settings:TJSONEncodeSettings = New TJSONEncodeSettings
-	Local nd:TJSONDouble
-	Print "precision = default (maximum)"
-	nd = TJSONDouble.Create( Float(85.1) )
-	Print JSON.Encode( nd )
-	nd = TJSONDouble.Create( Double(85.1) )
-	Print JSON.Encode( nd )
-	Print "precision = 7"
-	settings.default_precision = 7
-	nd = TJSONDouble.Create( Float(85.1) )
-	Print JSON.Encode( nd, settings )
-	nd = TJSONDouble.Create( Double(85.1) )
-	Print JSON.Encode( nd, settings )
-	Print "precision = 4"
-	settings.default_precision = 4
-	nd = TJSONDouble.Create( Float(85.1) )
-	Print JSON.Encode( nd, settings )
-	nd = TJSONDouble.Create( Double(85.1) )
-	Print JSON.Encode( nd, settings )
-	Print "precision = 1"
-	settings.default_precision = 1
-	nd = TJSONDouble.Create( Float(85.1) )
-	Print JSON.Encode( nd, settings )
-	nd = TJSONDouble.Create( Double(85.1) )
-	Print JSON.Encode( nd, settings )
-	Print "precision = 0"
-	settings.default_precision = 0
-	nd = TJSONDouble.Create( Float(85.1) )
-	Print JSON.Encode( nd, settings )
-	nd = TJSONDouble.Create( Double(85.1) )
-	Print JSON.Encode( nd, settings )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_escaped_backslash()
+	Print "*** test_escaped_backslash"
+	Local json_str$ = "{~qfoo~q: ~q\\~q}"
+	Local val:TString = New TString
+	val.value = "\"
+	Local obj:TObject = New TObject
+	obj.fields.Insert( "foo", val )
+	Local json_obj:TValue = TValue( json.parse( json_str ))
+	verify( json_obj.Equals( obj ), json_obj.ToString()+"~n"+obj.ToString() )
+EndFunction
 
+Function test_escaped_chars()
+	Print "*** test_escaped_chars"
+	Local json_str$ = "{~qfoo~q: ~q\\\\\\\~q~q}"
+	Local val:TString = New TString
+	val.value = "\\\~q"
+	Local obj:TObject = New TObject
+	obj.fields.Insert( "foo", val )
+	Local json_obj:TValue = TValue( json.parse( json_str ))
+	verify( json_obj.Equals( obj ), json_obj.ToString()+"~n"+obj.ToString() )
+EndFunction
 
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 1 - encoding" )
-Local jstr:String
-Local settings:TJSONEncodeSettings = New TJSONEncodeSettings
-Local d_settings:TJSONDecodeSettings = New TJSONDecodeSettings
-Local type_id:TTypeId
+Function test_escaped_newline()
+	Print "*** test_escaped_newline"
+	Local json_str$ = "{~qfoo~q: ~q\\\n~q}"
+	Local val:TString = New TString
+	val.value = "\~n"
+	Local obj:TObject = New TObject
+	obj.fields.Insert( "foo", val )
+	Local json_obj:TValue = TValue( json.parse( json_str ))
+	verify( json_obj.Equals( obj ), json_obj.ToString()+"~n"+obj.ToString() )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.1 - int array" )
-Try
-	Local arr_i:Int[] = [ 1, 2, 3, 40, 41, 42, 101 ]
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( arr_i, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( arr_i, settings )
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_string_with_escaped_line_break()
+	Print "*** test_string_with_escaped_line_break"
+	Local json_str$ = "{~qfoo~q:~qbar\nbar~q}"
+	Local val:TString = New TString
+	val.value = "bar~nbar"
+	Local obj:TValue = New TObject
+	TObject(obj).fields.Insert( "foo", val )
+	Local json_obj:TValue = TValue( json.parse( json_str ))
+	verify( json_obj.Equals( obj ), json_obj.ToString()+"~n"+obj.ToString() )
+	Local json_str_roundtrip$ = json.stringify( json_obj )
+	verify( json_str_roundtrip = json_str,  json_str+"~n"+json_str_roundtrip )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.2 - object of arbitrary type (ExampleData)" )
-'///
-Type ExampleData
-	Field b:Byte
-	Field s:Short
-	Field i:Int
-	Field l:Long
-	Field f:Float
-	Field d:Double
-	Field str:String
-	Field bx:Byte[]
-	Field sx:Short[]
-	Field ix:Int[]
-	Field lx:Long[]
-	Field fx:Float[]
-	Field dx:Double[]
-	Field strx:String[]
-	Field o1str:Object
-	Field o1x:Object
-	Field o1udt:Object
-End Type
-'///
-Type ExampleUserDefinedType
-	Field a:Int
-	Field b:Int
-	Field c:Int
-End Type
-'///
-Local ex_d:ExampleData
-'Try
-	ex_d = New ExampleData
-	ex_d.b = 135
-	ex_d.s = 36700
-	ex_d.i = 1587492043
-	ex_d.l = 4958248718354
-	ex_d.f = 0.00004524
-	ex_d.d = 1498510.459
-	ex_d.str = "Hello, World!"
-	ex_d.bx = [ Byte(12), Byte(23), Byte(135), Byte(3) ]
-	ex_d.sx = [ Short(1000), Short(3000), Short(5000), Short(20400) ]
-	ex_d.ix = [ 1475, 192334, 4952408 ]
-	ex_d.lx = [ Long(4498524), Long(4198475049), Long(8968763549) ]
-	ex_d.fx = [ 0.2498, 0.004245, 14356000.0 ]
-	ex_d.dx = [ Double(1.29854e24), Double(1.4985), Double(0.024587e-31) ]
-	ex_d.strx = [ "Hello 1", "Hello 2", "Hello 3" ]
-	ex_d.o1str = "String"
-	ex_d.o1x = [ "String 1", "String 2", "String 3" ]
-	Local udt:ExampleUserDefinedType = New ExampleUserDefinedType
-	udt.a = 50
-	udt.b = 100
-	udt.c = 150
-	ex_d.o1udt = udt
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( ex_d, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( ex_d, settings )
-	Print( jstr )
-'Catch ex$
-'	Print "Test FAILED with Exception: "+ex
-'End Try
+Function test_string_with_line_break()
+	Print "*** test_string_with_line_break"
+	Local json_str$ = "{~qfoo~q: ~qbar~nbar~q}"
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.2b: +ignoreFields( l, f, d, strx )" )
-Try
-	type_id = TTypeId.ForName("ExampleData")
-	settings.IgnoreField( type_id, type_id.FindField("l") )
-	settings.IgnoreField( type_id, type_id.FindField("f") )
-	settings.IgnoreField( type_id, type_id.FindField("d") )
-	settings.IgnoreField( type_id, type_id.FindField("strx") )
-	jstr = JSON.Encode( ex_d, settings )
-	Print( jstr )
-	settings:TJSONEncodeSettings = New TJSONEncodeSettings
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_string_literal()
+	Print "*** test_string_literal"
+	Local json_str$ = "~qfoo~q"
+	Local val:TString = New TString; val.value = "foo";
+	verify( val.Equals( json.parse( json_str )) )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.3 - array of arrays" )
-Try
-	Local arr_arr_i:Int[][][] = [ [ [ 0, 1 ], [ 2, 3 ] ], [ [ 4, 5 ], [ 6, 7 ] ] ]
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( arr_arr_i, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( arr_arr_i, settings )
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_number_literal()
+	Print "*** test_number_literal"
+	Local json_str$ = "1234"
+	Local val:TNumber = New TNumber; val.value = 1234;
+	verify( val.Equals( json.parse( json_str )) )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.4 - multi-dimensional array" )
-Try
-	Local arr2d_i:Int[,,] = New Int[2,2,2]
-	arr2d_i[0,0,0] = 0
-	arr2d_i[0,0,1] = 1
-	arr2d_i[0,1,0] = 2
-	arr2d_i[0,1,1] = 3  
-	arr2d_i[1,0,0] = 4
-	arr2d_i[1,0,1] = 5 
-	arr2d_i[1,1,0] = 6 
-	arr2d_i[1,1,1] = 7 
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( arr2d_i, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( arr2d_i, settings )
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_null_literal()
+	Print "*** test_null_literal"
+	Local json_str$ = "null"
+	Local val:TNull = New TNull
+	verify( val.Equals( json.parse( json_str )) )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.5 - TList" )
-Try
-	Local ls:TList = CreateList()
-	ls.AddLast( "String Value!" )
-	ls.AddLast( [ 0, 1, 2, 4, 8 ] )
-	ls.AddLast( CreateList() )
-	ls.AddLast( New Int[0] )
-	ls.AddLast( TJSONDouble.Create( 0.001 ))
-	ls.AddLast( TJSONLong.Create( 256 ))
-	ls.AddLast( TJSONBoolean.Create( True ))
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( ls, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( ls, settings )
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_boolean_literal()
+	Print "*** test_boolean_literal"
+	Local json_str$ = "true"
+	Local val:TBoolean = New TBoolean; val.value = True
+	verify( val.Equals( json.parse( json_str )) )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 1.6 - TMap" )
-Try
-	Local mp:TMap = CreateMap()
-	mp.Insert( "key1", "String Value!" )
-	mp.Insert( "key2", [ 0, 1, 2, 4, 8 ] )
-	mp.Insert( "key3", CreateList() )
-	mp.Insert( "key4", New Int[0] )
-	mp.Insert( "key5", TJSONDouble.Create( 0.001 ))
-	mp.Insert( "key6", TJSONLong.Create( 256 ))
-	mp.Insert( "key7", TJSONBoolean.Create( True ))
-	'///
-	settings.pretty_print = False
-	Print( "  -pretty_print" )
-	jstr = JSON.Encode( mp, settings )
-	Print( jstr )
-	'///
-	settings.pretty_print = True
-	Print( "  +pretty_print" )
-	jstr = JSON.Encode( mp, settings )
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_unclosed_array()
+	Print "*** test_unclosed_array"
+	Local json_str$ = LoadString( test_dir + "/fails/2.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
+Function test_unquotedkey_keys_must_be_quoted()
+	Print "*** test_unquotedkey_keys_must_be_quoted"
+	Local json_str$ = LoadString( test_dir + "/fails/3.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 2 - decoding" )
-Local res$, res_r$, res_r2$, res_r3$, size%, size2%, size3%, element$
+Function test_extra_comma()
+	Print "*** test_extra_comma"
+	Local json_str$ = LoadString( test_dir + "/fails/4.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.1 - string value" )
-Try
-	jstr = "~qQuoth the raven, \~qNever more.\~q~q"
-	Local str:Object = JSON.Decode( jstr )
-	Print( jstr+" --> "+str.ToString() )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_double_extra_comma()
+	Print "*** test_double_extra_comma"
+	Local json_str$ = LoadString( test_dir + "/fails/5.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.2 - integral value" )
-Try
-	jstr = "10487649"
-	Local num_i:Object = JSON.Decode( jstr )
-	Print( jstr+" --> "+num_i.ToString() )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_missing_value()
+	Print "*** test_missing_value"
+	Local json_str$ = LoadString( test_dir + "/fails/6.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.3 - floating-point value" )
-Try
-	jstr = "0.0024786"
-	Local num_fp:Object = JSON.Decode( jstr )
-	Print( jstr+" --> "+num_fp.ToString() )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_comma_after_the_close()
+	Print "*** test_comma_after_the_close"
+	Local json_str$ = LoadString( test_dir + "/fails/7.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.4 - boolean value" )
-Try
-	jstr = "true"
-	Local bt:Object = JSON.Decode( jstr )
-	Print( jstr+" --> "+bt.ToString() )
-	jstr = "false"
-	Local bf:Object = JSON.Decode( jstr )
-	Print( jstr+" --> "+bf.ToString() )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_extra_close()
+	Print "*** test_extra_close"
+	Local json_str$ = LoadString( test_dir + "/fails/8.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.5 - null value" )
-Try
-	jstr = "null"
-	Local val:Object = JSON.Decode( jstr )
-	If Not val Then res = "null" Else res = "not-null"
-	Print( jstr+" --> "+res )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_extra_comma_after_value()
+	Print "*** test_extra_comma_after_value"
+	Local json_str$ = LoadString( test_dir + "/fails/9.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.6 - int array" )
-Try
-	jstr = " [ 5,10,    15, 20 ] "
-	Local ix:Int[]
-	type_id = TTypeId.ForName("Int[]")
-	ix = Int[](JSON.Decode( jstr,, type_id ))
-	For Local i% = 0 Until ix.length
-		If i = 0 Then res = String.FromInt( ix[i] ) Else res :+ String.FromInt( ix[i] )
-		If i < ix.length - 1 Then res :+ ","
-	Next
-	res = "["+res+"]"
-	Print( jstr+" --> "+res )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_extra_value_after_close_with_misplaced_quotes()
+	Print "*** test_extra_value_after_close_with_misplaced_quotes"
+	Local json_str$ = LoadString( test_dir + "/fails/10.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.7 - simple object containing int array" )
-Type ExampleIntContainer
-	Field ix:Int[]
-End Type
-Try
-	jstr = "{ ~qix~q: [ 0, 1, 2, 10, 20, 100, 5000 ] }"
-	Local eic:ExampleIntContainer
-	type_id = TTypeId.ForName("ExampleIntContainer")
-	eic = ExampleIntContainer( JSON.Decode( jstr,, type_id ))
-	For Local i% = 0 Until eic.ix.length
-		If i = 0 Then res = String.FromInt( eic.ix[i] ) Else res :+ String.FromInt( eic.ix[i] )
-		If i < eic.ix.length - 1 Then res :+ ","
-	Next
-	res = "["+res+"]"
-	Print( jstr+" --> ExampleIntContainer("+eic.ToString()+"): ix="+res )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_illegal_expression_addition()
+	Print "*** test_illegal_expression_addition"
+	Local json_str$ = LoadString( test_dir + "/fails/11.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.8 - simple object of arbitrary type" )
-Try
-	jstr = "  { ~qb~q : 250,~qa~q:5  , ~qc~q  :105} "
-	Local eudt:ExampleUserDefinedType
-	type_id = TTypeId.ForName("ExampleUserDefinedType")
-	eudt = ExampleUserDefinedType( JSON.Decode( jstr,, type_id ))
-	Print( jstr+" --> ExampleUserDefinedType("+eudt.ToString()+"): a="+eudt.a+", b="+eudt.b+", c="+eudt.c )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_illegal_invocation_of_alert()
+	Print "*** test_illegal_invocation_of_alert"
+	Local json_str$ = LoadString( test_dir + "/fails/12.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.9 - object of arbitrary type" )
-Try
-	jstr = ..
-	"{~qb~q:135,~qs~q:36700,~qi~q:1587492043,~ql~q:4958248718354,~qf~q:0.00004524,~qd~q:1498510.459,~qstr~q:~qHello,World!~q,"+..
-	"~qbx~q:[12,23,135,3],~qsx~q:[1000,3000,5000,20400],~qix~q:[1475,192334,4952408],~qlx~q:[4498524,4198475049,8968763549],"+..
-	"~qfx~q:[0.2498,0.004245,14356000.0],~qdx~q:[1.29854e24,1.4985,0.024587e-31],~qstrx~q:[~qHello1~q,~qHello2~q,~qHello3~q],"+..
-	"~qo1str~q:~qString~q,~qo1x~q:[~qString1~q,~qString2~q,~qString3~q],~qo1udt~q:{~qa~q:50,~qb~q:100,~qc~q:150}}"
-	Print( "encoded: "+jstr )
-	Local ed:ExampleData
-	type_id = TTypeId.ForName("ExampleData")
-	ed = ExampleData( JSON.Decode( jstr,, type_id ))
-	res = "ExampleData("+ed.ToString()+"):"
-	res :+ "~n  "+"b = "+String.FromInt( ed.b )
-	res :+ "~n  "+"s = "+String.FromInt( ed.s )
-	res :+ "~n  "+"i = "+String.FromInt( ed.i )
-	res :+ "~n  "+"l = "+String.FromLong( ed.l )
-	res :+ "~n  "+"f = "+String.FromFloat( ed.f )
-	res :+ "~n  "+"d = "+String.FromDouble( ed.d )
-	res :+ "~n  "+"str = ~q"+ed.str+"~q"
-	size = ed.bx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.bx[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"bx = "+res_r
-	size = ed.sx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.sx[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"sx = "+res_r
-	size = ed.ix.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.ix[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"ix = "+res_r
-	size = ed.lx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.lx[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"lx = "+res_r
-	size = ed.fx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.fx[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"fx = "+res_r
-	size = ed.dx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + ed.dx[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"dx = "+res_r
-	size = ed.strx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "~q" + ed.strx[i] + "~q"
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	res :+ "~n  "+"strx = "+res_r
-	res :+ "~n  "+"o1str = "+JSON.ObjectInfo(ed.o1str)
-	res :+ "~n  "+"o1x = "+JSON.ObjectInfo(ed.o1x)
-	res :+ "~n  "+"o1udt = "+JSON.ObjectInfo(ed.o1udt)
-	Print( "decoded: "+res )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_numbers_cannot_have_leading_zeroes()
+	Print "*** test_numbers_cannot_have_leading_zeroes"
+	Local json_str$ = LoadString( test_dir + "/fails/13.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.10 - nested objects of explicit type" )
-'///
-Type ExampleObject
-	Field member:ExampleMemberObject
-End Type
-Type ExampleMemberObject
-	Field value:Int
-End Type
-'///
-Try
-	jstr = "{~qmember~q:{~qvalue~q:500}}"
-	type_id = TTypeId.ForName("ExampleObject")
-	Local ex:ExampleObject = ExampleObject( JSON.Decode( jstr,, type_id ))
-	Print( jstr+" --> JSON.Decode(ExampleObject) --> "+JSON.ObjectInfo(ex)+": member = "+JSON.ObjectInfo(ex.member) )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_numbers_cannot_be_hex()
+	Print "*** test_numbers_cannot_be_hex"
+	Local json_str$ = LoadString( test_dir + "/fails/14.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.11 - TMap" )
-Try
-	jstr = "{~qkey1~q:5,~qkey2~q:[10,15,20]}"
-	Local map:TMap = TMap( JSON.Decode( jstr,, TTypeId.ForName("TMap") ))
-	Print "encoded: "+jstr
-	Print "decoded: "+JSON.ObjectInfo(map)+..
-	"~n  key1 = "+JSON.ObjectInfo(map.ValueForKey("key1"))+..
-	"~n  key2 = "+JSON.ObjectInfo(map.ValueForKey("key2"))
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_illegal_backslash_escape_null()
+	Print "*** test_illegal_backslash_escape_null"
+	Local json_str$ = LoadString( test_dir + "/fails/15.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 2.12 - TList" )
-Try
-	
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+Function test_unquoted_text()
+	Print "*** test_unquoted_text"
+	Local json_str$ = LoadString( test_dir + "/fails/16.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_illegal_backslash_escape_sequence()
+	Print "*** test_illegal_backslash_escape_sequence"
+	Local json_str$ = LoadString( test_dir + "/fails/17.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_missing_colon()
+	Print "*** test_missing_colon"
+	Local json_str$ = LoadString( test_dir + "/fails/19.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_double_colon()
+	Print "*** test_double_colon"
+	Local json_str$ = LoadString( test_dir + "/fails/20.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_comma_instead_of_colon()
+	Print "*** test_comma_instead_of_colon"
+	Local json_str$ = LoadString( test_dir + "/fails/21.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_colon_instead_of_comma()
+	Print "*** test_colon_instead_of_comma"
+	Local json_str$ = LoadString( test_dir + "/fails/22.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_bad_raw_value()
+	Print "*** test_bad_raw_value"
+	Local json_str$ = LoadString( test_dir + "/fails/23.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_single_quotes()
+	Print "*** test_single_quotes"
+	Local json_str$ = LoadString( test_dir + "/fails/24.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_tab_character_in_string()
+	Print "*** test_tab_character_in_string"
+	Local json_str$ = LoadString( test_dir + "/fails/25.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_tab_character_in_string_2()
+	Print "*** test_tab_character_in_string_2"
+	Local json_str$ = LoadString( test_dir + "/fails/26.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_line_break_in_string()
+	Print "*** test_line_break_in_string"
+	Local json_str$ = LoadString( test_dir + "/fails/27.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_line_break_in_string_in_array()
+	Print "*** test_line_break_in_string_in_array"
+	Local json_str$ = LoadString( test_dir + "/fails/28.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_0e()
+	Print "*** test_0e"
+	Local json_str$ = LoadString( test_dir + "/fails/29.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_0e_()
+	Print "*** test_0e_"
+	Local json_str$ = LoadString( test_dir + "/fails/30.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_0e__1()
+	Print "*** test_0e__1"
+	Local json_str$ = LoadString( test_dir + "/fails/31.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_comma_instead_of_closing_brace()
+	Print "*** test_comma_instead_of_closing_brace"
+	Local json_str$ = LoadString( test_dir + "/fails/32.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_bracket_mismatch()
+	Print "*** test_bracket_mismatch"
+	Local json_str$ = LoadString( test_dir + "/fails/33.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_extra_brace()
+	Print "*** test_extra_brace"
+	Local json_str$ = LoadString( test_dir + "/fails/34.json" )
+	Try
+		json.parse( json_str )
+	Catch ex$
+		Return
+	EndTry
+	verify( False, "    should throw error" )
+EndFunction
+
+Function test_pass_1()
+	Print "*** test_pass_1"
+	Local json_str$ = LoadString( test_dir + "/passes/1.json" )
+	json.parse( json_str )
+EndFunction
+
+Function test_pass_2()
+	Print "*** test_pass_2"
+	Local json_str$ = LoadString( test_dir + "/passes/2.json" )
+	json.parse( json_str )
+EndFunction
+
+Function test_pass_3()
+	Print "*** test_pass_3"
+	Local json_str$ = LoadString( test_dir + "/passes/3.json" )
+	json.parse( json_str )
+EndFunction
 
 
-'////////////////////////////////////////
-Print( "~ntest 2.13 - int array array array" )
-Try
-	jstr = "[[[1,2],[4,8]],[[16,32],[64,128]]]"
-	Local ixx:Int[][][] = Int[][][]( JSON.Decode( jstr,, TTypeId.ForName("Int[][][]") ))
-	size = ixx.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		size2 = ixx[i].Length
-		For Local j% = 0 Until size2
-			If j = 0 Then res_r2 = "["
-			size3 = ixx[i][j].Length
-			For Local k% = 0 Until size3
-				If k = 0 Then res_r3 = "["
-				res_r3 :+ ixx[i][j][k]
-				If k < (size3 - 1) Then res_r3 :+ "," ..
-				Else If k = (size3 - 1) Then res_r3 :+ "]"
-			Next
-			res_r2 :+ res_r3
-			If j < (size2 - 1) Then res_r2 :+ "," ..
-			Else If j = (size2 - 1) Then res_r2 :+ "]"
-		Next
-		res_r :+ res_r2
-		If i < (size - 1) Then res_r :+ "," ..
-		Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	Print jstr+" ---> "+res_r
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
 
-'////////////////////////////////////////
-Print( "~ntest 2.13 - multidimensional int array" )
-Try
-	jstr = "[[[1,2],[4,8]],[[16,32],[64,128]]]"
-	Local ix2:Int[,,]
-	type_id = IntTypeId.ArrayType( 3 )
-	ix2 = Int[,,]( JSON.Decode( jstr,, type_id ))
-	res_r = ""
-	size = ix2.Length
-	Local dims:Int[] = ix2.Dimensions()
-	'Local c:Int[] = New Int[dims.Length]
-	'Local dim_size%
-	For Local i% = 0 Until size
-		For Local d% = EachIn dims
-			'If d = (d-1) Then dim_size = size Else dim_size = dims[d] / dims[d+1]
-			'c[d] = i Mod dim_size
-			If i Mod d = 0 Then res_r :+ "["
-		Next
-		res_r :+ type_id.GetArrayElement( ix2, i ).ToString() 'ix2[c[0],c[1],c[2]]
-		For Local d% = EachIn dims
-			If (i+1) Mod d = 0 Then res_r :+ "]"
-		Next
-		If i < (size-1) Then res_r :+ ","
-	Next
-	Print jstr+" ---> "+res_r
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
-
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 3 - round trip" )
-
-'////////////////////////////////////////
-Print( "~ntest 3.1 - int array" )
-Try
-	Local ar_int:Int[] = [ 0, 2, 4, 8, 16, 32, 64 ]
-	For Local i% = 0 Until ar_int.length
-		If i = 0 Then res = String.FromInt( ar_int[i] ) Else res :+ String.FromInt( ar_int[i] )
-		If i < ar_int.length - 1 Then res :+ ","
-	Next
-	res = "["+res+"]"
-	Print( "object:  "+res )
-	'///
-	settings.pretty_print = False
-	jstr = JSON.Encode( ar_int, settings )
-	Print( "encoded: "+jstr )
-	'///
-	Local d_int:Int[] = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]") ))
-	For Local i% = 0 Until d_int.length
-		If i = 0 Then res = String.FromInt( d_int[i] ) Else res :+ String.FromInt( d_int[i] )
-		If i < d_int.length - 1 Then res :+ ","
-	Next
-	res = "["+res+"]"
-	Print( "decoded: "+res )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
-
-
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 4 - negative testing" )
-
-'////////////////////////////////////////
-Print( "~ntest 4.1 - attempt to decode a string array into an int array" )
-jstr = "[~qstring1~q,~qstring2~q,~qstring3~q]"
-Print "encoded: "+jstr
-Local int_arr:Int[]
-Try
-	int_arr = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]") ))
-	size = int_arr.Length
-	For Local i% = 0 Until size
-		If i = 0 Then res_r = "["
-		element = "" + int_arr[i]
-		res_r :+ element
-		If i < (size - 1) Then res_r :+ "," Else If i = (size - 1) Then res_r :+ "]"
-	Next
-	Print "decoded: "+res_r
-	Print "Negative Test FAILED; exception was anticipated"
-Catch ex$
-	Print "Anticipated Exception: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 4.2 - decoding (JSON object.member:string) into (BMX Type.Field:Int)" )
-Try
-	jstr = "{~qvalue~q:~qString Value!~q}"
-	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr,, TTypeId.ForName("ExampleMemberObject") ))
-	Print "Negative Test FAILED; exception was anticipated"
-Catch ex$
-	Print "Anticipated Exception: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 4.3 - JSON object.member found with no corresponding BMX given Type.Field" )
-Try
-	jstr = "{~qgarbage_member_name~q:~qString Value!~q}"
-	Local obj:ExampleMemberObject = ExampleMemberObject( JSON.Decode( jstr,, TTypeId.ForName("ExampleMemberObject") ))
-	Print "Negative Test FAILED; exception was anticipated"
-Catch ex$
-	Print "Anticipated Exception: "+ex
-End Try
-
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 5 - field mapping" )
-
-'////////////////////////////////////////
-Print( "~ntest 5.1 - encode an object with some fields renamed" )
-Try
-	udt.a = 1
-	udt.b = 2
-	udt.c = 3
-	settings = New TJSONEncodeSettings
-	settings.OverrideFieldName( TTypeId.ForName( "ExampleUserDefinedType" ), "a", "type" )
-	jstr = JSON.Encode( udt, settings );
-	Print( jstr )
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 5.2 - round trip; decode the object from test 5.1, with fields renamed back to the original names" )
-Try
-	d_settings.OverrideFieldName( TTypeId.ForName( "ExampleUserDefinedType" ), "type", "a" )
-	udt = ExampleUserDefinedType( JSON.Decode( jstr, d_settings, TTypeId.ForName("ExampleUserDefinedType") ))
-	Print "udt.a = "+udt.a
-	Print "udt.b = "+udt.b
-	Print "udt.c = "+udt.c
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-'////////////////////////////////////////
-'////////////////////////////////////////
-'////////////////////////////////////////
-Print( "~n~ntest suite 6 - bug re-test" )
-
-'////////////////////////////////////////
-Print( "~ntest 6.1 - decode array with trailing comma" )
-Try
-	jstr = "[ 0, 1, 2, 3, 4, ]"
-	Local ar_int%[] = Int[]( JSON.Decode( jstr,, TTypeId.ForName("Int[]")))
-	res = ""
-	For Local i% = 0 Until ar_int.length
-		If i = 0 Then res = String.FromInt( ar_int[i] ) Else res :+ String.FromInt( ar_int[i] )
-		If i < ar_int.length - 1 Then res :+ ","
-	Next
-	res = "["+res+"]"
-	Print res
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 6.2.1 - decode object with trailing comma" )
-Try
-	jstr = "{ ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }"
-	udt = ExampleUserDefinedType( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType") ))
-	Print "udt.a = "+udt.a
-	Print "udt.b = "+udt.b
-	Print "udt.c = "+udt.c
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 6.2.2 - decode object with trailing comma, which is part of a larger array also with a trailing comma" )
-Try
-	jstr = "[ { ~qa~q: 1, ~qb~q: 2, ~qc~q: 3, }, ]"
-	Local udt_arr:ExampleUserDefinedType[] = ExampleUserDefinedType[]( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType[]") ))
-	Print "udt_arr[0].a = "+udt_arr[0].a
-	Print "udt_arr[0].b = "+udt_arr[0].b
-	Print "udt_arr[0].c = "+udt_arr[0].c
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 6.2.3 - decode array with trailing comma, which is part of a larger object also with a trailing comma" )
-Type ExampleUserDefinedType2 
-	Field a%[]
+Type type_1_simple
+	Field in1:Int
+	Field st1:String
+	Field st2:String
 EndType
-Try
-	jstr = "{ ~qa~q: [ 1, 2, 3, ], }"
-	Local udt2:ExampleUserDefinedType2 = ExampleUserDefinedType2( JSON.Decode( jstr,, TTypeId.ForName("ExampleUserDefinedType2") ))
-	Print "udt2.a[0] = "+udt2.a[0]
-	Print "udt2.a[1] = "+udt2.a[1]
-	Print "udt2.a[2] = "+udt2.a[2]
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
 
-'////////////////////////////////////////
-Print( "~ntest 6.3 - decode object with string field and incoming string is empty" )
-Try
-	Type ExampleStringContainer
-		Field name$
-	End Type
-	jstr = "{~qname~q:~q~q}"
-	Local esc:ExampleStringContainer = ExampleStringContainer( JSON.Decode( jstr,, TTypeId.ForName("ExampleStringContainer") ))
-	Print "~q~q --> ~q" + esc.name + "~q"
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
+Type type_2_complex
+	Field by:Byte
+	Field sh:Short
+	Field in:Int
+	Field lo:Long
+	Field fl:Float
+	Field do:Double
+	Field t1:type_1_simple
+	Field byArr:Byte[]
+	Field stArr:String[]
+EndType
 
-'////////////////////////////////////////
-Print( "~ntest 6.4 - mistakenly encoding empty array as empty object" )
-Try
-	Local ix%[] = New Int[0]
-	jstr = JSON.Encode( ix )
-	Print jstr
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
+Function test_map_object_to_tvalue()
+	Print "*** test_map_object_to_tvalue"
+	Local obj:type_1_simple = New type_1_simple
+	obj.in1 = 75
+	obj.st1 = "stri~qng1~q"
+	obj.st2 = "string2"
+	Local obj2:type_2_complex = New type_2_complex
+	obj2.by = 128
+	obj2.sh = 1280
+	obj2.in = 1457428982
+	obj2.lo = -2038719820
+	obj2.fl = 3848.5
+	obj2.do = 2.9999994999
+	obj2.t1 = obj
+	obj2.byArr = [ 24:Byte, 1:Byte, 99:Byte ]
+	obj2.stArr = [ "s1", "~n", "~t", "\" ]
+	Local json_str$ = json.stringify( obj2 )
+	Local test_str$ = "{~qby~q:128,~qbyArr~q:[24,1,99],~qdo~q:3,~qfl~q:3848.5,~qin~q:1457428982,~qlo~q:-2038719820,~qsh~q:1280,~qstArr~q:[~qs1~q,~q\n~q,~q\t~q,~q\\~q],~qt1~q:{~qin1~q:75,~qst1~q:~qstri\~qng1\~q~q,~qst2~q:~qstring2~q}}"
+	verify( json_str = test_str, test_str+"~n"+json_str )
+EndFunction
 
+Function test_map_tvalue_to_object()
+	Print "*** test_map_tvalue_to_object"
+	Local obj2:type_2_complex
+	Local json_str$ = "{~qby~q:128,~qbyArr~q:[24,1,99],~qdo~q:3,~qfl~q:3848.5,~qin~q:1457428982,~qlo~q:-2038719820,~qsh~q:1280,~qstArr~q:[~qs1~q,~q\n~q,~q\t~q,~q\\~q],~qt1~q:{~qin1~q:75,~qst1~q:~qstri\~qng1\~q~q,~qst2~q:~qstring2~q}}"
+	obj2 = type_2_complex( json.parse( json_str, "type_2_complex" ))
+	Local roundtrip_str$ = json.stringify( obj2 )
+	verify( json_str = roundtrip_str, "   ORIGINAL: "+json_str+"~n   ROUNDTRIP: "+roundtrip_str )
+EndFunction
 
-'////////////////////////////////////////
-Print( "~ntest 7.1 - # comment" )
-Try
-	jstr = "{~qname~q:~qTyler~q, # this is the name of a guy ~n~qsex~q:~qM~q, ~qage~q:26 }"
-	Type TheGuy
-		Field name$
-		Field sex$
-		Field age#
-	EndType
-	Local guy:TheGuy = TheGuy( JSON.Decode( jstr,, TTypeId.ForName("TheGuy") ))
-	Print "age --> "+guy.age
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
+Function test_pass_starfarer()
+	Print "*** test_pass_starfarer"
+	Local json_str$ = LoadString( test_dir + "/passes/starfarer.json" )
+	Local decoded:Object = json.parse( json_str )
+	verify( TObject(decoded).fields.ValueForKey( "enum1" ).ToString() = "~qENUM_VALUE~q", "~qENUM_VALUE~q <> "+TObject(decoded).fields.ValueForKey( "enum1" ).ToString() )
+EndFunction
 
-
-'////////////////////////////////////////
-Print( "~ntest 7.2 - implicit type conversion" )
-Try
-	jstr = "{~q_int~q:5,~q_float~q:2.5,~q_str_int~q:~q9~q,~q_str_float~q:~q7.75~q}"
-	Type Imp
-		Field _int$
-		Field _float$
-		Field _str_int%
-		Field _str_float#
-	EndType
-	Local obj:Imp = Imp( JSON.Decode( jstr,, TTypeId.ForName("Imp") ))
-	Print JSON.Encode( obj )
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-
-'////////////////////////////////////////
-'Print( "~ntest 7.3 - implicit type conversion on array elements" )
-Try
-	Rem
-	jstr = "[1,1.5,~q5~q,~q5.5~q]"
-	Type Imp
-		Field _int$
-		Field _float$
-		Field _str_int%
-		Field _str_float#
-	EndType
-	Local obj:Imp = Imp( JSON.Decode( jstr,, TTypeId.ForName("Imp") ))
-	Print JSON.Encode( obj )
-	EndRem
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-
-Rem
-'////////////////////////////////////////
-Print( "~ntest 7.4 - ignored decoded fields by name" )
-Try
-	jstr = "{~qa~q:1,~qb~q:2}"
-	Type SimpleType1
-		Field a%
-	EndType
-	Local ds:TJSONDecodeSettings = New TJSONDecodeSettings
-	ds.IgnoreFieldName( TTypeId.ForName("SimpleType1"), "b" )
-	Local s:SimpleType1 = SimpleType1( JSON.Decode( jstr, ds, TTypeId.ForName("SimpleType1") ))
-	Print JSON.Encode( s )
-Catch ex$
-	Print "Test FAILED: "+ex
-End Try
-EndRem
-
-
-'////////////////////////////////////////
-Print( "~ntest 8.1 - Encoding Object whose fields are a TList and a TMap" )
-Try
-	Type Complex
-		Field list:TList
-		Field map:TMap
-	EndType
-	Local c:Complex = New Complex
-	c.list = CreateList()
-	c.list.AddLast( "listval1" )
-	c.list.AddLast( "listval2" )
-	c.map = CreateMap()
-	c.map.Insert( "key1", "mapval1" )
-	c.map.Insert( "key2", "mapval2" )
-	Print JSON.Encode( c )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
-
-'////////////////////////////////////////
-Print( "~ntest 8.2 - Encoding Array whose elements are a TList and a TMap" )
-Try
-	Local a:Object[] = New Object[2]
+Function test_encode_TList()
+	Print "*** test_encode_TList"
 	Local list:TList = CreateList()
-	list.AddLast( "listval1" )
-	list.AddLast( "listval2" )
+	list.AddLast( "string1" )
+	list.AddLast( "string2" )
+	list.AddLast( "string3" )
+	Local json_str$ = json.stringify( list )
+	Local test_str$ = "[~qstring1~q,~qstring2~q,~qstring3~q]"
+	verify( test_str = json_str, test_str+"~n"+json_str )
+EndFunction
+
+Function test_encode_TMap()
+	Print "*** test_encode_TMap"
 	Local map:TMap = CreateMap()
-	map.Insert( "key1", "mapval1" )
-	map.Insert( "key2", "mapval2" )
-	Print JSON.Encode( a )
-Catch ex$
-	Print "Test FAILED with Exception: "+ex
-End Try
+	map.Insert( "key1", "string1" )
+	map.Insert( "key2", "string2" )
+	map.Insert( "key3", "string3" )
+	Local json_str$ = json.stringify( map )
+	Local test_str$ = "{~qkey1~q:~qstring1~q,~qkey2~q:~qstring2~q,~qkey3~q:~qstring3~q}"
+	verify( test_str = json_str, test_str+"~n"+json_str )
+EndFunction
+
+Function test_tvalue_transformation_search()
+	Print "*** test_tvalue_transformation_search"
+	Local json_str$ = LoadString( test_dir + "/passes/xf1_in.json" )
+	Local val:TValue = TValue( json.parse( json_str ))
+	Local xf:TValue_Transformation = TValue_Transformation.Create( ..
+		":string", json.XJ_DELETE, Null, Null )
+	Local results:TList = xf.Search( val )
+	Local json_out_expected$ = LoadString( test_dir + "/passes/xf1_out.json" )
+	Local json_out_actual$ = json.stringify( results )
+	verify( json_out_expected = json_out_actual, "   EXPECTED:~n"+json_out_expected+"~n   ACTUAL:~n"+json_out_actual )
+EndFunction
+
+
+Function test_tvalue_transformation_conditional_delete()
+	Print "*** test_tvalue_transformation_conditional_delete"
+	Local json_str$ = LoadString( test_dir + "/passes/xf2_in.json" )
+	json.add_transform( "parse", ":object/$ALPHA:string", json.XJ_DELETE )
+	json.add_transform( "parse", "@4:number", json.XJ_DELETE )
+	json.add_transform( "parse", "@5:boolean", json.XJ_DELETE )
+	json.add_transform( "parse", ":object/:boolean", json.XJ_DELETE,, __TBoolean_NOT )
+	Local val:TValue = TValue( json.parse( json_str,, "parse" ))
+	verify( TObject(TArray( val ).elements.ValueAtIndex(8)).fields.Contains("ALPHA") = False, "value should not be found" )
+	json.clear_transforms()
+EndFunction
+Function __TBoolean_NOT%( val:TValue )
+	If TBoolean(val) Then Return (Not TBoolean(val).value) ..
+	Else Return False
+EndFunction
+
+
+Function test_pass_sf_1()
+	Print "*** test_pass_sf_1"
+	Local json_str$ = LoadString( test_dir + "/passes/sfw1.json" )
+	json.parse( json_str )
+EndFunction
+
+Function test_pass_sf_2()
+	Print "*** test_pass_sf_2"
+	Local json_str$ = LoadString( test_dir + "/passes/sfw2.json" )
+	json.parse( json_str )
+EndFunction
+
+
+Type type_3_containers
+	Field str$
+	Field arr%[]
+	Field obj:type_3_containers
+EndType
+
+Function test_encode_empty_objects_instead_of_nulls()
+	Print "*** test_encode_empty_objects_instead_of_nulls"
+	Local obj:type_3_containers = New type_3_containers
+	Local json_str$
+	Local test_str$
+	json.empty_container_as_null = False
+	json_str = json.stringify( obj )
+	test_str = "{~qarr~q:[],~qobj~q:{},~qstr~q:~q~q}"
+	verify( test_str = json_str, "   EXPECTED:~n"+test_str+"~n   ACTUAL:~n"+json_str )
+	json.empty_container_as_null = True
+	json_str = json.stringify( obj )
+	test_str = "{~qarr~q:null,~qobj~q:null,~qstr~q:null}"
+	verify( test_str = json_str, "   EXPECTED:~n"+test_str+"~n   ACTUAL:~n"+json_str )
+EndFunction
+
+
+'/////////////////////////////////////////////////////////////////
+
+Function calc_hash%(s:String)
+	Local hc% = 0
+	Local l% = Len(s)
+	For Local i% = 0 To l
+		hc = hc * 131 + Asc(Right(s,l-i))
+	Next
+	hc = Abs(hc)
+	Return hc
+EndFunction
+
+Function verify( boolean_expression%, error_str$="" )
+	If Not boolean_expression
+		Throw "  TEST FAILED~n"+error_str
+	EndIf
+EndFunction
+
+Function run_test( test_function() )
+	Try
+		test_function()
+	Catch ex$
+		Print ex
+	EndTry
+EndFunction
+
+Function Main()
+	run_test( test_object )
+	run_test( test_escaped_backslash )
+	run_test( test_escaped_chars )
+	run_test( test_escaped_newline )
+	run_test( test_string_with_escaped_line_break )
+	run_test( test_string_with_line_break )
+	run_test( test_string_literal )
+	run_test( test_number_literal )
+	run_test( test_null_literal )
+	run_test( test_boolean_literal )
+	run_test( test_unclosed_array )
+	'run_test( test_unquotedkey_keys_must_be_quoted ) 'I explicitly allow unquoted strings as long as they use [_a-zA-Z0-9]+
+	'run_test( test_extra_comma ) 'I explicitly choose to accept: a single trailing comma (ARRAY)
+	run_test( test_double_extra_comma )
+	run_test( test_missing_value )
+	run_test( test_comma_after_the_close )
+	run_test( test_extra_close )
+	'run_test( test_extra_comma_after_value ) 'I explicitly choose to accept: a single trailing comma (OBJECT)
+	run_test( test_extra_value_after_close_with_misplaced_quotes )
+	run_test( test_illegal_expression_addition )
+	'run_test( test_illegal_invocation_of_alert ) 'Doesn't apply here; not Javascript
+	'run_test( test_numbers_cannot_have_leading_zeroes ) 'I accept leading zeroes because Blitzmax does
+	run_test( test_numbers_cannot_be_hex )
+	run_test( test_illegal_backslash_escape_null )
+	run_test( test_unquoted_text )
+	run_test( test_illegal_backslash_escape_sequence )
+	run_test( test_missing_colon )
+	run_test( test_double_colon )
+	run_test( test_comma_instead_of_colon )
+	run_test( test_colon_instead_of_comma )
+	'run_test( test_bad_raw_value ) 'Bad Raw Values are indistinguishable from unquoted strings
+	run_test( test_single_quotes )
+	run_test( test_tab_character_in_string )
+	run_test( test_tab_character_in_string_2 )
+	run_test( test_line_break_in_string )
+	run_test( test_line_break_in_string_in_array )
+	run_test( test_0e )
+	run_test( test_0e_ )
+	run_test( test_0e__1 )
+	run_test( test_comma_instead_of_closing_brace )
+	run_test( test_bracket_mismatch )
+	run_test( test_extra_brace )
+	run_test( test_pass_1 )
+	run_test( test_pass_2 )
+	run_test( test_pass_3 )
+	run_test( test_map_object_to_tvalue )
+	run_test( test_map_tvalue_to_object )
+	run_test( test_pass_starfarer )
+	run_test( test_encode_TList )
+	run_test( test_encode_TMap )
+	run_test( test_tvalue_transformation_search )
+	run_test( test_tvalue_transformation_conditional_delete )
+	run_test( test_pass_sf_1 )
+	run_test( test_pass_sf_2 )
+	run_test( test_encode_empty_objects_instead_of_nulls )
+EndFunction
+
+Main()
 
