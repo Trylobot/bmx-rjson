@@ -1,0 +1,5 @@
+
+*.exe
+mod/twrc.mod/rjson.mod/rjson.bmx
+*.s
+*.o

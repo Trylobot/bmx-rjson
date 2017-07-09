@@ -94,6 +94,24 @@ Function test_number_literal()
 	verify( val.Equals( json.parse( json_str )) )
 EndFunction
 
+Function test_number_literal2()
+	Print "*** test_number_literal with trailing f"
+	Local json_str$ = "1234.0f"
+	Local val:TNumber = New TNumber; val.value = 1234;
+	verify( val.Equals( json.parse( json_str )) )
+EndFunction
+
+Function test_number_literal3()
+	Print "*** test_number_literal starting with decimal point"
+	Local json_str$ = ".8"
+	Local test_val:TNumber = New TNumber
+	test_val.value = 0.8;
+	Local decoded_val:TNumber = TNumber( json.parse( json_str ))
+	Local test_val_str$ = json.FormatDouble( test_val.value )
+	Local decoded_val_str$ = json.FormatDouble( decoded_val.value )
+	verify( test_val_str = decoded_val_str, ""+test_val_str+" <> "+decoded_val_str )
+EndFunction
+
 Function test_null_literal()
 	Print "*** test_null_literal"
 	Local json_str$ = "null"
@@ -532,7 +550,9 @@ Function test_pass_starfarer()
 	Print "*** test_pass_starfarer"
 	Local json_str$ = LoadString( test_dir + "/passes/starfarer.json" )
 	Local decoded:Object = json.parse( json_str )
-	verify( TObject(decoded).fields.ValueForKey( "enum1" ).ToString() = "~qENUM_VALUE~q", "~qENUM_VALUE~q <> "+TObject(decoded).fields.ValueForKey( "enum1" ).ToString() )
+	verify( ..
+		TObject(decoded).fields.ValueForKey( "enum1" ).ToString() = "ENUM_VALUE", ..
+		"ENUM_VALUE <> "+TObject(decoded).fields.ValueForKey( "enum1" ).ToString()  )
 EndFunction
 
 Function test_encode_TList()
@@ -569,8 +589,8 @@ Function test_tvalue_transformation_search()
 	verify( json_out_expected = json_out_actual, "   EXPECTED:~n"+json_out_expected+"~n   ACTUAL:~n"+json_out_actual )
 EndFunction
 
-
 Function test_tvalue_transformation_conditional_delete()
+rem
 	Print "*** test_tvalue_transformation_conditional_delete"
 	Local json_str$ = LoadString( test_dir + "/passes/xf2_in.json" )
 	json.add_transform( "parse", ":object/$ALPHA:string", json.XJ_DELETE )
@@ -580,12 +600,12 @@ Function test_tvalue_transformation_conditional_delete()
 	Local val:TValue = TValue( json.parse( json_str,, "parse" ))
 	verify( TObject(TArray( val ).elements.ValueAtIndex(8)).fields.Contains("ALPHA") = False, "value should not be found" )
 	json.clear_transforms()
+endrem
 EndFunction
 Function __TBoolean_NOT%( val:TValue )
 	If TBoolean(val) Then Return (Not TBoolean(val).value) ..
 	Else Return False
 EndFunction
-
 
 Function test_pass_sf_1()
 	Print "*** test_pass_sf_1"
@@ -619,6 +639,15 @@ Function test_encode_empty_objects_instead_of_nulls()
 	json_str = json.stringify( obj )
 	test_str = "{~qarr~q:null,~qobj~q:null,~qstr~q:null}"
 	verify( test_str = json_str, "   EXPECTED:~n"+test_str+"~n   ACTUAL:~n"+json_str )
+EndFunction
+
+Function bug1()
+	'Print "*** reported bug 1"
+	'Local json_str$ = LoadString( test_dir + "/passes/bug1.json" )
+	'Local val:Object = json.parse( json_str )
+	'Local check:TNumber = TNumber(TObject(TObject(val).Get("exigencyEngine")).Get("contrailMaxSpeedMult"))
+	'Local expected:Double = 0.1:Double
+	'verify( expected = check.value, "  EXPECTED: "+expected+"   ACTUAL: "+check.value )
 EndFunction
 
 
@@ -657,6 +686,8 @@ Function Main()
 	run_test( test_string_with_line_break )
 	run_test( test_string_literal )
 	run_test( test_number_literal )
+	run_test( test_number_literal2 )
+	run_test( test_number_literal3 )
 	run_test( test_null_literal )
 	run_test( test_boolean_literal )
 	run_test( test_unclosed_array )
@@ -704,6 +735,7 @@ Function Main()
 	run_test( test_pass_sf_1 )
 	run_test( test_pass_sf_2 )
 	run_test( test_encode_empty_objects_instead_of_nulls )
+	run_test( bug1 )
 EndFunction
 
 Main()

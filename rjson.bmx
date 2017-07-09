@@ -51,10 +51,19 @@ Transformations can optionally specify a condition function that determines at r
   imperative for a selected object should actually run; in this way they can vary based on arbitrary
   user-defined conditions.
 
+Supported transformation type selectors:
+	null
+	boolean
+	number
+	string
+	array
+	object
+
+
 Supported transformation imperatives:
 * XJ_DELETE 
 * XJ_RENAME( new_field_name )
-* XJ_CONVERT( new_json_type_code ) 
+* XJ_CONVERT( new_json_type_code )
 
 
 EndRem
@@ -72,18 +81,20 @@ Type json
 	
 	'Global settings
 	Global error_level% = 2 'legend   2: as strict as possible   1: ignore warnings   0: ignore errors & warnings
+	Global ext_logging_fn( msg$ ) 'function that can be externalized for logging
 
 	'Encode settings
 	Global formatted% = True 'false: compact,   true: indented; global setting
+	Global formatted_array% = True 'false: compact,   true: indented; global setting
 	Global empty_container_as_null% = False 'false: [] {} "",   true: null
 	Global indent_size% = 2 'spaces per indent level, if formatted is true; global setting
-	Global precision% = 6 'default floating-point precision, can be overridden per field/object/instance/item/value
+	Global precision% = 6 'cstdio.h default floating-point precision; can be overridden per field/object/instance/item/value
 	
 	'Transformations
 	Global transformations:TMap = CreateMap()
 	
 	'Generate a JSON-Encoded String from an arbitrary Object
-	Function stringify:String( source_object:Object, transforms_set$=Null )
+	Function stringify:String( source_object:Object, transforms_set$ = Null )
 		If Not source_object Then Return TValue.VALUE_NULL ' --> "null"
 		Local source_object_converted:TValue = reflect_to_TValue( source_object )
 		execute_transforms( transforms_set, source_object_converted )
@@ -91,7 +102,7 @@ Type json
 	EndFunction
 	
 	'Generate an Object of the given type name from a JSON-Encoded String
-	Function parse:Object( encoded$, type_id$=Null, transforms_set$=Null )
+	Function parse:Object( encoded$, type_id$ = Null, transforms_set$ = Null )
 		If encoded = Null Then Return Null
 		Local cursor% = 0
 		Local intermediate_object:TValue = allocate_TValue( encoded, cursor )
@@ -105,17 +116,17 @@ Type json
 				Local destination_object:Object = initialize_object( intermediate_object, destination_type_id )
 				Return destination_object
 			Else
-				json_error( json.LOG_ERROR+" Type ID not found: "+type_id )
+				json_error( json.LOG_ERROR + " Type ID not found: " + type_id )
 			EndIf
 		Else 'type_id not provided
 			Return intermediate_object
 		EndIf
 	EndFunction
 
-	Function add_transform( set_name$, selector$, imperative_id%, argument:Object=Null, condition_func%( val:TValue )=Null )
+	Function add_transform( set_name$, selector$, imperative_id%, argument:Object = Null, condition_func%( val:TValue, root:TValue ) = Null )
 		Local xform:TValue_Transformation
 		xform = TValue_Transformation.Create( selector, imperative_id, argument, condition_func )
-		Local set:TList = TList( transformations.ValueForKey( set_name ))
+		Local set:TList = TList( transformations.ValueForKey( set_name ) )
 		If Not set
 			set = CreateList()
 			transformations.Insert( set_name, set )
@@ -125,11 +136,14 @@ Type json
 
 	Function execute_transforms( set_name$, val:TValue )
 		If set_name
-			For Local xform:TValue_Transformation = EachIn TList( transformations.ValueForKey( set_name ))
-				If xform
-					xform.Execute( val ) 'Execute any available transformations
-				EndIf
-			Next
+			Local xform_set:TList = TList( transformations.ValueForKey( set_name ) )
+			If xform_set
+				For Local xform:TValue_Transformation = EachIn xform_set
+					If xform
+						xform.Execute( val ) 'Execute any available transformations
+					EndIf
+				Next
+			EndIf
 		EndIf
 	EndFunction
 
@@ -151,8 +165,9 @@ Type json
 	Const SEL_NUMBER$  = "number"
 	Const SEL_STRING$  = "string"
 	Const SEL_ARRAY$   = "array"
-	Const SEL_OBJECT$  = "object"
-
+	Const SEL_OBJECT$ = "object"
+	Const SEL_EMUN$ = "emun"
+	
 	'////////////////////////////////////////////////////////////////////////////
 
 	Function allocate_TValue:TValue( encoded$, cursor% )
@@ -172,6 +187,8 @@ Type json
 				intermediate_object = New TArray
 			Case TValue.JSONTYPE_OBJECT
 				intermediate_object = New TObject
+			Case TValue.JSONTYPE_ENUM
+				intermediate_object = New TEnum				
 		EndSelect
 		Return intermediate_object
 	EndFunction
@@ -179,7 +196,7 @@ Type json
 
 	'Nested Array Types (e.g.: Int[][][] ) ARE supported
 	'Single Arrays with Multiple Dimensions (e.g.: Int[4,3,5] ) are NOT supported
-	Function reflect_to_TValue:TValue( source_object:Object, explicit_source_object_type_id:TTypeId=Null )
+	Function reflect_to_TValue:TValue( source_object:Object, explicit_source_object_type_id:TTypeId = Null )
 		If source_object = Null ..
 		And (json.empty_container_as_null = True Or explicit_source_object_type_id = Null)
 			Return New TNull
@@ -287,7 +304,7 @@ Type json
 		Or type_id = TTypeId.ForName("Object")
 			source_mapped = source
 		Else
-			Local source_object_type_id:TTypeId = TTypeId.ForObject( source ) 
+			Local source_object_type_id:TTypeId = TTypeId.ForObject( source )
 			'Check for cyclic built-in types; process them in a special way for convenience
 			If type_id = TMap_TTypeId And TObject(source)
 				source_mapped = TObject(source).fields
@@ -352,13 +369,13 @@ Type json
 										ElseIf TBoolean(source_field_value)
 											source_mapped_field.SetDouble( source_mapped, Double(TBoolean(source_field_value).value) )
 										ElseIf TString(source_field_value)
-											source_mapped_field.SetDouble( source_mapped, Double(TString(source_field_value).value.ToDouble()) )
+											source_mapped_field.SetDouble( source_mapped, Double(TString(source_field_value).value.ToDouble() ) )
 										Else
 											json_error( json.LOG_WARN+" could not initialize "+source_mapped_field.TypeId().Name()+" from "+TTypeId.ForObject( source_field_value ).Name() )
 										EndIf
 									Default
 										'Recurse
-										source_mapped_field.Set( source_mapped, initialize_object( source_field_value, source_mapped_field.TypeId() ))
+										source_mapped_field.Set( source_mapped, initialize_object( source_field_value, source_mapped_field.TypeId() ) )
 								EndSelect
 							Else
 								json_error( json.LOG_WARN+" could not find field name "+field_name+" in object of type "+type_id.Name() )
@@ -393,7 +410,7 @@ Type json
 									EndIf
 								Default
 									'Recurse
-									type_id.SetArrayElement( source_mapped, index, initialize_object( source_element_value, element_type_id ))
+									type_id.SetArrayElement( source_mapped, index, initialize_object( source_element_value, element_type_id ) )
 							EndSelect
 						EndIf
 						index :+ 1
@@ -420,7 +437,7 @@ Type json
 
 	'////////////////////////////////////////////////////////////////////////////
 
-	Function FormatDouble:String( value:Double, precision:Int )
+	Function FormatDouble:String( value:Double, precision:Int=-1 )
 		'trims trailing zeroes and decimal separator
 		Extern "C"
 			Function snprintf_:Int( s:Byte Ptr, n:Int, Format$z, p:Int, v1:Double) = "snprintf"
@@ -428,12 +445,12 @@ Type json
 		Const CHAR_0:Byte = Asc("0")
 		Const CHAR_DOT:Byte = Asc(".")
 		Const STR_FMT:String = "%.*f"
-		If precision = -1 Then precision = 6 'cstdio.h default
+		If precision = -1 Then precision = json.precision
 		Local i:Double
 		Local buf:Byte[256]
 		Local sz:Int = snprintf_( buf, buf.Length, STR_FMT, precision, value)
 		sz :- 1
-		While (sz > 0) And (buf[sz] = CHAR_0)
+		While (sz > 0) And (buf[sz] = CHAR_0) And precision > 0
 			sz :- 1
 		Wend
 		If (sz < buf.Length) And buf[sz] <> CHAR_DOT
@@ -464,7 +481,7 @@ Type json
 		End While
 	EndFunction
 
-	Function EatSpecific%( encoded$, cursor% Var, char_filter$, limit% = -1, require% = -1 )
+	Function EatSpecific%( encoded$, cursor% Var, char_filter$, limit% = - 1, require% = - 1 )
 		Local cursor_start% = cursor
 		Local contained_in_filter% = True
 		While cursor < encoded.Length And contained_in_filter
@@ -478,11 +495,11 @@ Type json
 			If contained_in_filter
 				cursor :+ 1
 			End If
-			If limit <> -1 And (cursor - cursor_start) >= limit
+			If limit <> - 1 And (cursor - cursor_start) >= limit
 				Exit
 			End If
 		End While
-		If require <> -1 And (cursor - cursor_start) < require
+		If require <> - 1 And (cursor - cursor_start) < require
 			json_error( json.LOG_ERROR+" expected at least "+require+" characters from the set ["+char_filter+"]" )
 		End If
 		Return cursor - cursor_start
@@ -502,7 +519,7 @@ Type json
 	EndFunction
 
 	Function Escape$( str$ )
-		Return str.Replace( "\", "\\" ).Replace( "~q", "\~q" ).Replace( "~r", "\r" ).Replace( "~n", "\n" ).Replace( "~t", "\t" )  
+		Return str.Replace( "\", "\\" ).Replace( "~q", "\~q" ).Replace( "~r", "\r" ).Replace( "~n", "\n" ).Replace( "~t", "\t" )
 	EndFunction
 
 	Function IsNumeric%( char$ )
@@ -514,7 +531,7 @@ Type json
 	End Function
 
 	Function IsAlphaNumericOrUnderscore%( char$ )
-		If char.Length > 1 Then char = char[0..1]
+		If char.length > 1 Then char = char[0..1]
 		Local ascii_code% = Asc( char )
 		Return (ascii_code >= Asc( "A" ) And ascii_code <= Asc( "Z" )) ..
 		Or     (ascii_code >= Asc( "a" ) And ascii_code <= Asc( "z" )) ..
@@ -569,8 +586,8 @@ Type json
 	EndFunction
 
 	'logging/exceptions /////////////////////////////////////////////////////////
-	Const LOG_WARN$ = "[WARN]"
-	Const LOG_ERROR$ = "[ERROR]"
+	Const LOG_WARN$ = " [WARN]"
+	Const LOG_ERROR$ = " [ERROR]"
 
 	'supported built-in cyclic data types ///////////////////////////////////////
 	Global TMap_TTypeId:TTypeId = TTypeId.ForName("TMap")
@@ -616,10 +633,14 @@ Function json_error( message$ )
 			If message.StartsWith( json.LOG_ERROR )
 				Throw message
 			Else
-				DebugLog message
+				If json.ext_logging_fn
+					json.ext_logging_fn( message )
+				EndIf
 			EndIf
 		Case 0 ' ignore all
-			DebugLog message
+			If json.ext_logging_fn
+				json.ext_logging_fn( message )
+			EndIf
 	EndSelect
 EndFunction
 
@@ -663,6 +684,8 @@ Type TValue
 				Return json.SEL_ARRAY
 			Case JSONTYPE_OBJECT
 				Return json.SEL_OBJECT
+			Case JSONTYPE_ENUM
+				Return json.SEL_EMUN
 			Default
 				Return Null
 		EndSelect
@@ -675,7 +698,7 @@ Type TValue
 	Function PredictJSONType%( encoded$, cursor% )
 		If encoded = Null Or encoded = "" Then Return JSONTYPE_NULL
 		json.EatWhitespace( encoded, cursor )
-		encoded = encoded[cursor..(cursor+SCAN_DISTANCE)]
+		encoded = encoded[cursor..(cursor + SCAN_DISTANCE)]
 		If encoded.StartsWith( VALUE_NULL )
 			Return JSONTYPE_NULL
 		ElseIf encoded.StartsWith( VALUE_TRUE ) Or encoded.StartsWith( VALUE_FALSE )
@@ -689,7 +712,7 @@ Type TValue
 		ElseIf encoded.StartsWith( OBJECT_BEGIN )
 			Return JSONTYPE_OBJECT
 		ElseIf json.IsAlphaNumericOrUnderscore( encoded )
-			Return JSONTYPE_STRING 'unquoted string
+			Return JSONTYPE_ENUM 'unquoted string that should be a emun item.
 		Else
 			Return JSONTYPE_INVALID
 		EndIf
@@ -700,9 +723,10 @@ Type TValue
 	Const JSONTYPE_NULL%    = 0
 	Const JSONTYPE_BOOLEAN% = 1
 	Const JSONTYPE_NUMBER%  = 2
-	Const JSONTYPE_STRING%  = 3
-	Const JSONTYPE_ARRAY%   = 4
-	Const JSONTYPE_OBJECT%  = 5
+	Const JSONTYPE_STRING% = 3
+	Const JSONTYPE_ARRAY% = 4
+	Const JSONTYPE_OBJECT% = 5
+	Const JSONTYPE_ENUM% = 6	
 
 	'ASCII Literals
 	Const OBJECT_BEGIN$                  = "{"
@@ -818,6 +842,8 @@ Type TBoolean Extends TValue
 				val.value = (Not TArray(other).elements.IsEmpty())
 			Case JSONTYPE_OBJECT
 				val.value = (Not TObject(other).fields.IsEmpty())
+			Case JSONTYPE_ENUM
+				val.value = (TEnum(other).value <> "")
 		EndSelect
 		Return val
 	EndFunction
@@ -838,14 +864,19 @@ Type TNumber Extends TValue
 	EndMethod
 
 	Method Decode( encoded$, cursor% Var )
+		'(untested) roughly equivalent regular expression:
+		'  [+-.]?\d+(:?[.]\d+)?(:?[eE][+-]?\d+)?f?
 		json.EatWhitespace( encoded, cursor )
 		Local cursor_start% = cursor
 		Local floating_point% = False
 		json.EatSpecific( encoded, cursor, "+-", 1 ) 'positive/negative
-		json.EatSpecific( encoded, cursor, "0123456789",, 1 )
-		If json.EatSpecific( encoded, cursor, ".", 1 ) 'decimal pt.
+		If json.EatSpecific( encoded, cursor, ".", 1 ) 'leading decimal pt.
 			floating_point = True
-			json.EatSpecific( encoded, cursor, "0123456789",, 1 )
+		End If
+		json.EatSpecific( encoded, cursor, "0123456789",, 1 )
+		If Not floating_point And json.EatSpecific( encoded, cursor, ".", 1 ) 'middle decimal pt.
+			floating_point = True
+			json.EatSpecific( encoded, cursor, "0123456789",, 1 ) 'digits following decimal point
 		End If
 		If json.EatSpecific( encoded, cursor, "eE", 1 ) 'scientific notation
 			floating_point = True
@@ -857,7 +888,7 @@ Type TNumber Extends TValue
 		End If
 		If (cursor - cursor_start) > 0
 			Local encoded_number$ = encoded[cursor_start..cursor]
-			If encoded_number And encoded_number.Length > 0
+			If encoded_number And encoded_number.length > 0
 				value = encoded_number.ToDouble()
 			End If
 		End If
@@ -888,6 +919,8 @@ Type TNumber Extends TValue
 				val.value = 0
 			Case JSONTYPE_OBJECT
 				val.value = 0
+			Case JSONTYPE_ENUM
+				val.value = TEnum(other).value.ToDouble()
 		EndSelect
 		Return val
 	EndFunction
@@ -916,14 +949,14 @@ Type TString Extends TValue
 		Local unquoted_mode_active% = False
 		json.EatWhitespace( encoded, cursor )
 		Local char$, char_temp$
-		If cursor >= (encoded.Length) Then Return
+		If cursor >= (encoded.length) Then Return
 		char = Chr(encoded[cursor]); cursor :+ 1
 		If char <> STRING_BEGIN
 			If json.IsAlphaNumericOrUnderscore( char )
 				decoded_value :+ char 'NORMAL STRING CHARACTER
 				unquoted_mode_active = True
 			Else
-				json_error( json.LOG_ERROR+" expected string at position "+(cursor-1)+json.ShowPosition(encoded,(cursor-1)) )
+				json_error( json.LOG_ERROR + " expected string at position " + (cursor - 1) + json.ShowPosition(encoded, (cursor - 1) ) )
 			EndIf
 		End If
 		If Not unquoted_mode_active
@@ -1014,12 +1047,106 @@ Type TString Extends TValue
 				val.value = ""
 			Case JSONTYPE_OBJECT
 				val.value = ""
+			Case JSONTYPE_ENUM
+				val.value = TEnum(other).value			
 		EndSelect
 		Return val
 	EndFunction
-
+	
+	Function CreateFromString:TString (input$)
+		Local str:TString = New TString
+		str.value = Input
+		Return str
+	End Function
 EndType
 
+Type TEnum Extends TValue
+
+	Field value:String
+
+	Method New()
+		value_type = JSONTYPE_ENUM
+	EndMethod
+
+	Method Encode:String( indent%, precision% )
+		If value = Null And json.empty_container_as_null
+			Return VALUE_NULL
+		Else
+			Return json.Escape( value )
+		EndIf
+	EndMethod
+
+	Method Decode( encoded$, cursor% Var )
+		Local decoded_value$ = ""
+		Local unquoted_mode_active% = False
+		json.EatWhitespace( encoded, cursor )
+		Local char$, char_temp$
+		char = Chr(encoded[cursor]); cursor :+ 1
+		If cursor >= (encoded.length) Then Return
+		If json.IsAlphaNumericOrUnderscore( char )
+			decoded_value :+ char 'NORMAL STRING CHARACTER
+		Else
+			json_error( json.LOG_ERROR + " expected string at position " + (cursor - 1) + json.ShowPosition(encoded, (cursor - 1) ) )
+		endif
+		' Enumeration Mode
+		' This means AlphaNumeric or Underscore characters ONLY
+		' Any other characters encountered from this point on will trigger the end of the string
+		Repeat
+			If cursor >= encoded.length
+				Exit 'done (but could indicate an error higher up the chain)
+			EndIf
+			char = Chr(encoded[cursor]); cursor :+ 1
+			If json.IsAlphaNumericOrUnderscore( char )
+				decoded_value :+ char 'NORMAL STRING CHARACTER
+			Else
+				cursor :- 1
+				Exit 'done
+			EndIf
+		Until cursor >= encoded.Length
+		value = decoded_value
+	EndMethod
+
+	Method Copy:TValue()
+		Local val:TEnum = New TEnum
+		val.value = value
+		Return val
+	EndMethod
+
+	Method Equals%( other:Object )
+		Return (TEnum(other) <> Null And TEnum(other).value_type = JSONTYPE_ENUM And TEnum(other).value = Self.value)
+	EndMethod
+	
+	Method ToString$()
+		Return value
+	End Method
+
+	Function Create:TValue( other:TValue )
+		Local val:TEnum = New TEnum
+		Select other.value_type
+			Case JSONTYPE_NULL
+				val.value = other.Encode( 0, json.precision )
+			Case JSONTYPE_BOOLEAN
+				val.value = other.Encode( 0, json.precision )
+			Case JSONTYPE_NUMBER
+				val.value = other.Encode( 0, json.precision )
+			Case JSONTYPE_STRING
+				val.value = TString(other).value
+			Case JSONTYPE_ARRAY
+				val.value = ""
+			Case JSONTYPE_OBJECT
+				val.value = ""
+			Case JSONTYPE_ENUM
+				val.value = TEnum(other).value			
+		EndSelect
+		Return val
+	EndFunction
+	
+	Function CreateFromString:TEnum (input$)
+		Local emun:TEnum = New TEnum
+		emun.value = Input
+		Return emun
+	End Function
+EndType
 
 Type TArray Extends TValue
 
@@ -1040,9 +1167,9 @@ Type TArray Extends TValue
 			EndIf
 		Else
 			encoded :+ ARRAY_BEGIN
-			If json.formatted Then encoded :+ "~n"
-			If json.formatted Then indent :+ 1
-			If json.formatted Then encoded :+ json.RepeatSpace( indent*json.indent_size )
+			If json.formatted And json.formatted_array Then encoded :+ "~n"
+			If json.formatted And json.formatted_array Then indent :+ 1
+			If json.formatted And json.formatted_array Then encoded :+ json.RepeatSpace( indent*json.indent_size )
 			Local size% = elements.Count()
 			Local index% = 0
 			For Local element:TValue = EachIn elements
@@ -1054,12 +1181,12 @@ Type TArray Extends TValue
 				index :+ 1
 				If index < size
 					encoded :+ VALUE_SEPARATOR
-					If json.formatted Then encoded :+ "~n"
-					If json.formatted Then encoded :+ json.RepeatSpace( indent*json.indent_size )
+					If json.formatted And json.formatted_array Then encoded :+ "~n"
+					If json.formatted And json.formatted_array Then encoded :+ json.RepeatSpace( indent*json.indent_size )
 				Else 'index >= size
-					If json.formatted Then encoded :+ "~n"
-					If json.formatted Then indent :- 1
-					If json.formatted Then encoded :+ json.RepeatSpace( indent*json.indent_size )
+					If json.formatted And json.formatted_array Then encoded :+ "~n"
+					If json.formatted And json.formatted_array Then indent :- 1
+					If json.formatted And json.formatted_array Then encoded :+ json.RepeatSpace( indent * json.indent_size )
 				EndIf
 			Next
 			encoded :+ ARRAY_END
@@ -1140,6 +1267,14 @@ Type TArray Extends TValue
 		Return True
 	EndMethod
 
+	Method Get:TValue( idx% )
+		If idx >= 0 And idx < elements.Count()
+			Return TValue( elements.ValueAtIndex( idx ))
+		Else
+			Return Null
+		EndIf
+	EndMethod
+
 	Function Create:TValue( other:TValue )
 		Local val:TArray
 		Select other.value_type
@@ -1158,6 +1293,8 @@ Type TArray Extends TValue
 				For Local field_name$ = EachIn TObject(other).fields.Keys()
 					val.elements.AddLast( TValue(TObject(other).fields.ValueForKey( field_name )).Copy() )
 				Next
+			Case JSONTYPE_ENUM
+				val = New TArray
 		EndSelect
 		Return val
 	EndFunction
@@ -1288,6 +1425,10 @@ Type TObject Extends TValue
 		Return True
 	EndMethod
 
+	Method Get:TValue( key$ )
+		Return TValue( fields.ValueForKey( key ))
+	EndMethod
+
 	Function Create:TValue( other:TValue )
 		Local val:TObject
 		Select other.value_type
@@ -1307,7 +1448,9 @@ Type TObject Extends TValue
 					idx :+ 1
 				Next
 			Case JSONTYPE_OBJECT
-				val = TObject(other.Copy())
+				val = TObject(other.Copy() )
+			Case JSONTYPE_ENUM
+				val = New TObject
 		EndSelect
 		Return val
 	EndFunction
@@ -1353,7 +1496,7 @@ Type TValue_Selector_Token
 
 	Function ParseSelectorTypeName$( selector_token$ )
 		Local cursor% = selector_token.Find( SELECTOR_TYPE_NAME_START )
-		If cursor <> -1
+		If cursor <> - 1
 			Local value$ = ""
 			cursor :+ 1
 			While cursor < selector_token.Length ..
@@ -1436,9 +1579,9 @@ Type TValue_Transformation
 	Field selector:TValue_Selector_Token[]
 	Field imperative_id%
 	Field argument:Object
-	Field condition_func%( val:TValue )
+	Field condition_func%( val:TValue, root:TValue )
 
-	Function Create:TValue_Transformation( selector$, imperative_id%, argument:Object, condition_func%( val:TValue ) )
+	Function Create:TValue_Transformation( selector$, imperative_id%, argument:Object, condition_func%( val:TValue, root:TValue ))
 		Local xf:TValue_Transformation = New TValue_Transformation
 		xf.selector = ParseSelectorString( selector )
 		xf.imperative_id = imperative_id
@@ -1450,7 +1593,7 @@ Type TValue_Transformation
 	Method Execute( val:TValue )
 		Local matches:TList = Search( val )
 		For Local result:TValue_Search_Result = EachIn matches
-			If (condition_func = Null) Or (condition_func( result.matched ) = True)
+			If (condition_func = Null) Or (condition_func( result.matched, val ) = True)
 				Select imperative_id
 					
 					Case json.XJ_DELETE
@@ -1482,6 +1625,8 @@ Type TValue_Transformation
 								new_val = TArray.Create( old_val )
 							Case json.SEL_OBJECT
 								new_val = TObject.Create( old_val )
+							Case json.SEL_EMUN
+								new_val = TEnum.Create(old_val)							
 						EndSelect
 						If result.container_TObject
 							result.container_TObject.fields.Insert( result.object_field_name, new_val )
@@ -1523,7 +1668,7 @@ Type TValue_Transformation
 					path[path.Length - 1] = New TValue_Selector_Token
 					path[path.Length - 1].type_name = field_value.GetSelectorCode()
 					path[path.Length - 1].object_field_name = field_name
-					Search( field_value, this, matches, path )
+					Search( field_value, this, matches, path ) 'RECURSIVE CALL
 				Next
 			ElseIf TArray(this)
 				'search all elements of arrays
@@ -1532,7 +1677,7 @@ Type TValue_Transformation
 					path[path.Length - 1] = New TValue_Selector_Token
 					path[path.Length - 1].type_name = array_element.GetSelectorCode()
 					path[path.Length - 1].array_element_index = element_index
-					Search( array_element, this, matches, path )
+					Search( array_element, this, matches, path ) 'RECURSIVE CALL
 					element_index :+ 1
 				Next
 			EndIf
@@ -1553,5 +1698,32 @@ Type TValue_Transformation
 
 EndType
 
+'////////////////////////////////
 
+Function predicate_omit_if_empty_string%( val:TValue, root:TValue )
+	'omit val if it is null/empty string
+	Return TString(val) And TString(val).value = ""
+EndFunction
+
+Function predicate_omit_if_empty_object%( val:TValue, root:TValue )
+	'omit val if it is null/empty string
+	Return TObject(val) And TObject(val).fields.IsEmpty()
+EndFunction
+
+Function predicate_omit_if_empty_array%( val:TValue, root:TValue )
+	'omit val if it is null/empty string
+	Return TArray(val) And TArray(val).elements.IsEmpty()
+EndFunction
+
+Function predicate_omit_if_equals_zero%( val:TValue, root:TValue )
+	Return TNumber (val) And TNumber(val).value = 0
+EndFunction	
+
+Function predicate_omit_if_boolean_equals_TRUE%( val:TValue, root:TValue )
+	Return TBoolean (val) And TBoolean(val).value = 1
+EndFunction
+
+Function predicate_omit_if_boolean_equals_FALSE%( val:TValue, root:TValue )
+	Return TBoolean (val) And TBoolean(val).value = 0
+EndFunction
 
